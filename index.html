@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Smarte Einkaufsliste</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 14px; background: #eceff1; color: #263238; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); margin-bottom: 14px; }
+    h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #1a237e; }
+    
+    /* Supermarkt-Umschalter */
+    .store-bar { display: flex; gap: 8px; }
+    .btn-store { flex: 1; padding: 12px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: 0.15s; }
+    .btn-store.active { background: #3f51b5; color: white; }
+
+    /* Eingaben */
+    .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    input[type="text"] { flex: 1; padding: 12px; font-size: 1rem; border: 1px solid #cfd8dc; border-radius: 8px; outline: none; }
+    .btn-primary { padding: 12px 18px; background: #00897b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+    .btn-mic { width: 100%; padding: 14px; background: #e53935; color: white; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn-mic.recording { background: #b71c1c; box-shadow: 0 0 12px rgba(229, 57, 53, 0.6); }
+    .status { font-size: 0.85rem; color: #546e7a; margin-top: 6px; }
+
+    /* Kategorien & Artikel */
+    .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
+    .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
+    .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+    .item-row:last-child { border-bottom: none; }
+    .item-row input[type="checkbox"] { width: 22px; height: 22px; margin-right: 12px; cursor: pointer; }
+    .item-name { flex: 1; font-size: 1.05rem; }
+    .item-name.done { text-decoration: line-through; color: #9e9e9e; }
+    .btn-delete { background: none; border: none; color: #b0bec5; font-size: 1.4rem; cursor: pointer; padding: 0 8px; line-height: 1; }
+    .btn-delete:hover { color: #e53935; }
+
+    /* Teilen */
+    .btn-share { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <div class="card">
+      <h2>Supermarkt-Laufweg</h2>
+      <div class="store-bar">
+        <button class="btn-store active" id="btn-aldi" onclick="switchStore('aldi')">Aldi</button>
+        <button class="btn-store" id="btn-famila" onclick="switchStore('famila')">Famila</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Eingabe (Tastatur & Sprache)</h2>
+      <div class="input-row">
+        <input type="text" id="manual-input" placeholder="z. B. Kartoffeln, Brot, Milch..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <button class="btn-primary" onclick="addFromInput()">+</button>
+      </div>
+      <button class="btn-mic" id="btn-mic" onclick="toggleVoice()">🎙️ Spracheingabe starten</button>
+      <div class="status" id="mic-status">Tippe auf das Mikrofon. Die Aufnahme bleibt an, bis du wieder drückst.</div>
+    </div>
+
+    <div class="card">
+      <h2>Einkaufsliste</h2>
+      <div id="list-container">Keine Artikel auf der Liste.</div>
+    </div>
+
+    <div class="card">
+      <button class="btn-share" onclick="shareList()">🔗 Liste teilen (Link kopieren)</button>
+      <div class="status" id="share-status" style="text-align: center;"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // 1. Deine Laufwege je Supermarkt
+    const storeRoutes = {
+       aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Hygenie", "Knabbersachen", "Kühlregal", "Sonstiges"],
+      famila: ["Getränke", "Gemüse", "Brot", "Süßigkeiten", "Alkohol", "Kaffee", "Knabbersachen", "Kühlregal", "Fleisch und Wurst", "Sonstiges"]
+    };
+
+    // 2. Zuordnung der Lebensmittel zu den Kategorien
+    const categoryDict = {
+      // Gemüse & Obst
+      "kartoffeln": "Gemüse", "kartoffel": "Gemüse", "tomaten": "Gemüse", "tomate": "Gemüse", 
+      "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "äpfel": "Gemüse", "apfel": "Gemüse", 
+      "bananen": "Gemüse", "banane": "Gemüse", "paprika": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse",
+      // Brot & Backwaren
+      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "toast": "Brot", "mehl": "Brot",
+      // Süßigkeiten
+      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
+      // Fleisch & Wurst
+      "hackfleisch": "Fleisch und Wurst", "salami": "Fleisch und Wurst", "bratwurst": "Fleisch und Wurst", "schinken": "Fleisch und Wurst", "fleisch": "Fleisch und Wurst", "wurst": "Fleisch und Wurst",
+      // Kühlregal
+      "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "butter": "Kühlregal", "käse": "Kühlregal", "quark": "Kühlregal", "joghurt": "Kühlregal", "sahne": "Kühlregal"
+    };
+
+    let activeStore = "aldi";
+    let items = [];
+
+    function initData() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sharedData = urlParams.get('data');
+
+      if (sharedData) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+          items = parsed.items || [];
+          if (parsed.store) activeStore = parsed.store;
+          saveLocal();
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch(e) {}
+      } else {
+        const saved = localStorage.getItem('local_einkaufsliste');
+        if (saved) {
+          try { items = JSON.parse(saved); } catch(e) {}
+        }
+        const savedStore = localStorage.getItem('local_einkaufsliste_store');
+        if (savedStore) activeStore = savedStore;
+      }
+      switchStore(activeStore);
+    }
+
+    function saveLocal() {
+      localStorage.setItem('local_einkaufsliste', JSON.stringify(items));
+      localStorage.setItem('local_einkaufsliste_store', activeStore);
+    }
+
+    function switchStore(name) {
+      activeStore = name;
+      document.getElementById('btn-aldi').className = 'btn-store ' + (name === 'aldi' ? 'active' : '');
+      document.getElementById('btn-famila').className = 'btn-store ' + (name === 'famila' ? 'active' : '');
+      saveLocal();
+      render();
+    }
+
+    // Verbesserter Text- und Sprachfilter
+    function parseAndAdd(rawText) {
+      let text = rawText.toLowerCase();
+
+      // Aufnahme per Sprache beenden
+      if (text.includes("aufnahme beenden") || text.includes("stop")) {
+        stopVoice();
+        return;
+      }
+
+      // Marktwechsel erkennen
+      if (text.includes("aldi")) switchStore("aldi");
+      if (text.includes("famila")) switchStore("famila");
+
+      // 1. Ganze Phrasen und Satzbausteine herausfiltern
+      const phrasesToRemove = [
+        "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
+        "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
+        "kauf bitte", "kaufe bitte", "bring bitte mit", "bring mit", "besorge bitte",
+        "schreib auf", "setz auf die liste", "auf die liste"
+      ];
+
+      phrasesToRemove.forEach(p => {
+        text = text.replaceAll(p, " ");
+      });
+
+      // 2. Fließtext an Trennwörtern und Satzzeichen aufteilen
+      const rawWords = text.split(/[\s,.;]+|\sund\s|\ssowie\s|\sauch\s/);
+
+      // 3. Einzelne Rest-Füllwörter herausfiltern
+      const stopWords = [
+        "ich", "du", "wir", "er", "sie", "es", "noch", "auch", "etwas", 
+        "brauche", "brauchen", "kauf", "kaufe", "kaufen", "bitte", 
+        "aldi", "famila", "für", "bei", "den", "die", "das", "ein", "eine", "einen", "einem", "einer"
+      ];
+
+      rawWords.forEach(w => {
+        const word = w.trim();
+        if (!word || stopWords.includes(word) || word.length <= 1) return;
+
+        // Artikel zuweisen
+        const cat = categoryDict[word] || "Sonstiges";
+        const title = word.charAt(0).toUpperCase() + word.slice(1);
+
+        // Prüfen, ob der Artikel schon auf der Liste steht
+        const exists = items.some(i => i.title.toLowerCase() === title.toLowerCase());
+        if (!exists) {
+          items.push({
+            id: 'id_' + Date.now() + Math.random().toString(36).substr(2, 4),
+            title: title,
+            category: cat,
+            done: false
+          });
+        }
+      });
+
+      saveLocal();
+      render();
+    }
+
+    function addFromInput() {
+      const input = document.getElementById('manual-input');
+      if (input.value.trim()) {
+        parseAndAdd(input.value);
+        input.value = "";
+      }
+    }
+
+    function toggleItem(id) {
+      const item = items.find(i => i.id === id);
+      if (item) {
+        item.done = !item.done;
+        saveLocal();
+        render();
+      }
+    }
+
+    function deleteItem(id) {
+      items = items.filter(i => i.id !== id);
+      saveLocal();
+      render();
+    }
+
+    function render() {
+      const container = document.getElementById('list-container');
+      container.innerHTML = "";
+
+      if (items.length === 0) {
+        container.innerHTML = "<div style='color: #888;'>Keine Artikel auf der Liste.</div>";
+        return;
+      }
+
+      const currentOrder = storeRoutes[activeStore];
+
+      currentOrder.forEach(catName => {
+        const matching = items.filter(i => i.category === catName);
+        if (matching.length === 0) return;
+
+        const block = document.createElement('div');
+        block.className = "cat-block";
+        block.innerHTML = `<div class="cat-header">${catName}</div>`;
+
+        matching.forEach(item => {
+          const row = document.createElement('div');
+          row.className = "item-row";
+          row.innerHTML = `
+            <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleItem('${item.id}')">
+            <span class="item-name ${item.done ? 'done' : ''}">${item.title}</span>
+            <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
+          `;
+          block.appendChild(row);
+        });
+
+        container.appendChild(block);
+      });
+    }
+
+    function shareList() {
+      const payload = { store: activeStore, items: items };
+      const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const shareUrl = window.location.origin + window.location.pathname + '?data=' + base64;
+
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        const status = document.getElementById('share-status');
+        status.textContent = "Fertig! Link kopiert. Sende ihn per WhatsApp/Messenger weiter.";
+        setTimeout(() => { status.textContent = ""; }, 5000);
+      }).catch(() => {
+        prompt("Kopiere diesen Link:", shareUrl);
+      });
+    }
+
+    // ----------------------------------------------------
+    // DAUERHAFTE SPRACHAUFNAHME (Bleibt an bis zum Knopfdruck)
+    // ----------------------------------------------------
+    let recognition = null;
+    let keepRecording = false;
+
+    function toggleVoice() {
+      if (keepRecording) {
+        stopVoice();
+      } else {
+        startVoice();
+      }
+    }
+
+    function startVoice() {
+      const status = document.getElementById('mic-status');
+      const micBtn = document.getElementById('btn-mic');
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRec) {
+        status.textContent = "Hinweis: Spracherkennung benötigt Google Chrome.";
+        return;
+      }
+
+      keepRecording = true;
+      micBtn.classList.add('recording');
+      micBtn.textContent = "⏹️ Aufnahme beenden (Drücken zum Stoppen)";
+      status.textContent = "Daueraufnahme aktiv... Sprich frei! (z.B. 'Ich brauche Kartoffeln und ich brauche Eier')";
+
+      if (!recognition) {
+        recognition = new SpeechRec();
+        recognition.lang = 'de-DE';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = (evt) => {
+          for (let i = evt.resultIndex; i < evt.results.length; i++) {
+            if (evt.results[i].isFinal) {
+              const text = evt.results[i][0].transcript;
+              status.textContent = `Erkannt: "${text}"`;
+              parseAndAdd(text);
+            }
+          }
+        };
+
+        // Automatischer Wiederanlauf, falls der Browser nach einer Pause trennt
+        recognition.onend = () => {
+          if (keepRecording) {
+            try { recognition.start(); } catch(e) {}
+          } else {
+            micBtn.classList.remove('recording');
+            micBtn.textContent = "🎙️ Spracheingabe starten";
+          }
+        };
+
+        recognition.onerror = (e) => {
+          if (e.error === 'not-allowed') {
+            stopVoice();
+            status.textContent = "Mikrofon-Zugriff verweigert.";
+          }
+        };
+      }
+
+      try {
+        recognition.start();
+      } catch (e) {
+        // Falls bereits gestartet
+      }
+    }
+
+    function stopVoice() {
+      keepRecording = false;
+      const status = document.getElementById('mic-status');
+      const micBtn = document.getElementById('btn-mic');
+      micBtn.classList.remove('recording');
+      micBtn.textContent = "🎙️ Spracheingabe starten";
+      status.textContent = "Aufnahme beendet. Bereit für die nächste Eingabe.";
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+      }
+    }
+
+    initData();
+  </script>
+</body>
+</html>
