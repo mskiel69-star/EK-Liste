@@ -120,14 +120,13 @@
 
   </div>
 
-  <!-- Modal: Laufweg & Globale Kategorie hinzufügen -->
+  <!-- Modal: Laufweg, Neue Kategorie & Kategorie löschen -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben oder Kategorie löschen:</p>
       <ul class="drag-list" id="drag-container"></ul>
       
-      <!-- Neue Kategorie eintragen (gilt immer für BEIDE Supermärkte) -->
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
         <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen (gilt für Aldi & Famila):</label>
         <div class="input-row" style="margin-top: 6px;">
@@ -151,15 +150,12 @@
   </div>
 
   <script>
-    // Standard-Laufwege
     const defaultRoutes = {
       aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
       famila: ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
     };
 
-    // Große Lebensmittel-Datenbank
     const initialDict = {
-      // Gemüse & Obst
       "zucchini": "Gemüse", "aubergine": "Gemüse", "ingwer": "Gemüse", "kartoffeln": "Gemüse", "kartoffel": "Gemüse", 
       "süßkartoffeln": "Gemüse", "tomaten": "Gemüse", "tomate": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", 
       "salat": "Gemüse", "eisbergsalat": "Gemüse", "rucola": "Gemüse", "äpfel": "Gemüse", "apfel": "Gemüse", 
@@ -169,38 +165,26 @@
       "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "beeren": "Gemüse",
       "erdbeeren": "Gemüse", "heidelbeeren": "Gemüse", "trauben": "Gemüse", "weintrauben": "Gemüse", "spinat": "Gemüse",
       "lauch": "Gemüse", "porree": "Gemüse", "radieschen": "Gemüse", "kohlrabi": "Gemüse",
-
-      // Brot & Backwaren
       "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", 
       "vollkornbrot": "Brot", "toast": "Brot", "toastbrot": "Brot", "roggenmehl": "Brot", "weizenmehl": "Brot", 
       "dinkelmehl": "Brot", "mehl": "Brot", "hefe": "Brot", "frischhefe": "Brot", "trockenhefe": "Brot", 
       "backpulver": "Brot", "croissant": "Brot", "laugenstange": "Brot", "haferflocken": "Brot",
-
-      // Süßigkeiten & Snacks
       "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", 
       "gummibärchen": "Süßigkeiten", "bonbons": "Süßigkeiten", "erdnüsse": "Süßigkeiten", "nüsse": "Süßigkeiten", 
       "salzstangen": "Süßigkeiten", "eis": "Süßigkeiten", "waffeln": "Süßigkeiten",
-
-      // Fleisch, Wurst & Fisch
       "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", 
       "bratwurst": "Fleisch und Wurst", "schinken": "Fleisch und Wurst", "kochschinken": "Fleisch und Wurst", 
       "fleisch": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", 
       "hähnchenbrust": "Fleisch und Wurst", "rinderhack": "Fleisch und Wurst", "steak": "Fleisch und Wurst", 
       "lachs": "Fleisch und Wurst", "thunfisch": "Fleisch und Wurst", "forelle": "Fleisch und Wurst", "wiener": "Fleisch und Wurst",
-
-      // Kühlregal
       "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "vollmilch": "Kühlregal", "hafermilch": "Kühlregal", 
       "butter": "Kühlregal", "käse": "Kühlregal", "gouda": "Kühlregal", "parmesan": "Kühlregal", "mozzarella": "Kühlregal", 
       "frischkäse": "Kühlregal", "quark": "Kühlregal", "magerquark": "Kühlregal", "joghurt": "Kühlregal", 
       "sahne": "Kühlregal", "schlagsahne": "Kühlregal", "saure sahne": "Kühlregal", "schmand": "Kühlregal", 
       "crème fraîche": "Kühlregal", "feta": "Kühlregal",
-
-      // Getränke
       "wasser": "Getränke", "mineralwasser": "Getränke", "bier": "Getränke", "cola": "Getränke", 
       "saft": "Getränke", "apfelsaft": "Getränke", "orangensaft": "Getränke", "wein": "Getränke", 
       "kaffee": "Getränke", "tee": "Getränke",
-
-      // Drogerie
       "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", 
       "shampoo": "Drogerie", "duschgel": "Drogerie", "zahnpasta": "Drogerie", "spülmittel": "Drogerie", 
       "waschmittel": "Drogerie", "müllbeutel": "Drogerie", "alufolie": "Drogerie", "backpapier": "Drogerie"
@@ -261,7 +245,6 @@
       render();
     }
 
-    // Sprach- & Textfilter mit automatischer Reaktivierung abgehakter Artikel
     function parseAndAdd(rawText) {
       let text = rawText.toLowerCase();
 
@@ -421,9 +404,6 @@
       }
     }
 
-    // ----------------------------------------------------
-    // KATEGORIE PRO ARTIKEL ÄNDERN & LERNEN
-    // ----------------------------------------------------
     function openCategoryModal(itemId) {
       editingItemId = itemId;
       const item = items.find(i => i.id === itemId);
@@ -462,9 +442,6 @@
       closeCategoryModal();
     }
 
-    // ----------------------------------------------------
-    // LAUFWEG & GEMEINSAME KATEGORIE-VERWALTUNG
-    // ----------------------------------------------------
     function openRouteModal() {
       document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
       renderRouteList();
@@ -482,7 +459,19 @@
         li.className = "drag-item";
         li.draggable = true;
         li.dataset.index = index;
-        li.innerHTML = `<span>☰ ${cat}</span> <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>`;
+        
+        // Neu: HTML inkl. Löschen-Button, falls es nicht "Sonstiges" ist
+        const canDelete = cat !== 'Sonstiges';
+        
+        li.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="cursor:grab;">☰ ${cat}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>
+            ${canDelete ? `<button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0; color:#e53935;" title="Kategorie löschen">🗑️</button>` : `<span style="width:20px;"></span>`}
+          </div>
+        `;
 
         li.addEventListener('dragstart', handleDragStart);
         li.addEventListener('dragover', handleDragOver);
@@ -493,7 +482,40 @@
       });
     }
 
-    // NEU: Trägt eine neue Kategorie automatisch in BEIDE Supermärkte ein!
+    // NEU: Kategorie global für beide Märkte löschen
+    function deleteCategory(catName) {
+      if(catName === "Sonstiges") {
+        alert("Die Kategorie 'Sonstiges' dient als Auffangbecken und kann nicht gelöscht werden.");
+        return;
+      }
+      
+      if(confirm(`Möchtest du die Kategorie "${catName}" wirklich für alle Märkte löschen?\nAlle darin befindlichen Artikel werden automatisch nach "Sonstiges" verschoben.`)) {
+        
+        // Aus Aldi und Famila entfernen
+        ["aldi", "famila"].forEach(store => {
+          storeRoutes[store] = storeRoutes[store].filter(c => c !== catName);
+        });
+
+        // Alle betroffenen Artikel sicher nach 'Sonstiges' verschieben
+        items.forEach(item => {
+          if (item.category === catName) {
+            item.category = "Sonstiges";
+          }
+        });
+
+        // Im Wörterbuch aufräumen
+        Object.keys(categoryDict).forEach(key => {
+          if (categoryDict[key] === catName) {
+            categoryDict[key] = "Sonstiges";
+          }
+        });
+
+        saveLocal();
+        renderRouteList(); // Modal-Liste aktualisieren
+        render(); // Hauptansicht aktualisieren
+      }
+    }
+
     function addNewCategory() {
       const input = document.getElementById('new-category-input');
       const val = input.value.trim();
@@ -521,6 +543,10 @@
     let dragSrcEl = null;
 
     function handleDragStart(e) {
+      if (e.target.tagName.toLowerCase() === 'button') {
+        e.preventDefault();
+        return;
+      }
       dragSrcEl = this;
       this.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -534,7 +560,7 @@
 
     function handleDrop(e) {
       if (e.stopPropagation) e.stopPropagation();
-      if (dragSrcEl !== this) {
+      if (dragSrcEl !== this && dragSrcEl) {
         const container = document.getElementById('drag-container');
         const itemsList = Array.from(container.querySelectorAll('.drag-item'));
         const srcIdx = itemsList.indexOf(dragSrcEl);
@@ -550,13 +576,16 @@
     }
 
     function handleDragEnd() {
-      this.classList.remove('dragging');
+      if(this.classList) this.classList.remove('dragging');
     }
 
     function saveCustomRoute() {
       const container = document.getElementById('drag-container');
-      const itemsList = Array.from(container.querySelectorAll('.drag-item span:first-child'));
-      const newOrder = itemsList.map(el => el.textContent.replace('☰ ', '').trim());
+      const itemsList = Array.from(container.querySelectorAll('.drag-item'));
+      
+      const newOrder = itemsList.map(li => {
+        return li.querySelector('span').textContent.replace('☰ ', '').trim();
+      });
 
       storeRoutes[activeStore] = newOrder;
       saveLocal();
@@ -564,9 +593,6 @@
       document.getElementById('route-modal').style.display = 'none';
     }
 
-    // ----------------------------------------------------
-    // TEILEN-FUNKTION
-    // ----------------------------------------------------
     function shareList() {
       const payload = { store: activeStore, items: items };
       const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -581,9 +607,6 @@
       });
     }
 
-    // ----------------------------------------------------
-    // DAUERHAFTE SPRACHAUFNAHME
-    // ----------------------------------------------------
     let recognition = null;
     let keepRecording = false;
 
