@@ -22,9 +22,55 @@
     }
     .store-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .store-header-row h2 { margin: 0; font-size: 0.95rem; color: #1a237e; }
-    .header-btns { display: flex; gap: 6px; align-items: center; }
-    .btn-settings { background: #eceff1; border: 1px solid #b0bec5; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-    .btn-danger-reset { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+    
+    /* Aufklappbares Menü (Akkordeon / Burger-Stil) */
+    .menu-container { position: relative; }
+    .btn-menu-toggle {
+      background: #eceff1;
+      border: 1px solid #b0bec5;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 36px;
+      background: white;
+      border: 1px solid #cfd8dc;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      min-width: 170px;
+      z-index: 150;
+      overflow: hidden;
+    }
+    .dropdown-menu.show { display: flex; flex-direction: column; }
+    .dropdown-item {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #37474f;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover { background: #f5f5f5; }
+    .dropdown-item.danger { color: #c62828; }
+    .dropdown-item.danger:hover { background: #ffebee; }
+
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #e53935; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
@@ -126,7 +172,7 @@
     .btn-share { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
   </style>
 </head>
-<body>
+<body onclick="closeDropdownIfClickedOutside(event)">
 
   <!-- Fixierte Menüleiste oben -->
   <div class="top-bar">
@@ -135,12 +181,26 @@
         <span class="live-indicator" id="live-dot" title="Sync-Status"></span>
         <h2>Supermarkt-Laufweg</h2>
       </div>
-      <div class="header-btns">
-        <button class="btn-danger-reset" onclick="resetAllData()" title="Löscht hängengebliebene Speicherreste">🧹 Reset</button>
-        <button class="btn-settings" onclick="openSyncModal()">🔄 Sync-Code</button>
-        <button class="btn-settings" onclick="openRouteModal()">⚙️ Laufweg</button>
+
+      <!-- Aufklappbares Options-Menü -->
+      <div class="menu-container">
+        <button class="btn-menu-toggle" onclick="toggleDropdownMenu(event)">
+          ⚙️ Optionen ▾
+        </button>
+        <div class="dropdown-menu" id="dropdown-menu">
+          <button class="dropdown-item" onclick="handleMenuClick(openRouteModal)">
+            ⚙️ Laufweg
+          </button>
+          <button class="dropdown-item" onclick="handleMenuClick(openSyncModal)">
+            🔄 Sync-Code
+          </button>
+          <button class="dropdown-item danger" onclick="handleMenuClick(resetAllData)">
+            🧹 Reset
+          </button>
+        </div>
       </div>
     </div>
+
     <div class="store-bar">
       <button class="btn-store active" id="btn-aldi" onclick="switchStore('aldi')">Aldi</button>
       <button class="btn-store" id="btn-famila" onclick="switchStore('famila')">Famila</button>
@@ -193,7 +253,7 @@
     </div>
   </div>
 
-  <!-- Laufweg Modal inkl. Umbenennen-Funktion -->
+  <!-- Laufweg Modal -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
@@ -212,7 +272,7 @@
     </div>
   </div>
 
-  <!-- Kategorie Zuweisungs-Modal -->
+  <!-- Kategorie Modal -->
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
@@ -267,7 +327,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v5/${syncCode}`;
+      const topic = `einkauf_live_v6/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -305,7 +365,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v5/${syncCode}`;
+        const topic = `einkauf_live_v6/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -356,8 +416,29 @@
       render();
     }
 
+    /* Aufklapp-Menü Funktionen */
+    function toggleDropdownMenu(e) {
+      e.stopPropagation();
+      const menu = document.getElementById('dropdown-menu');
+      menu.classList.toggle('show');
+    }
+
+    function closeDropdownIfClickedOutside(e) {
+      const menu = document.getElementById('dropdown-menu');
+      if (menu && menu.classList.contains('show')) {
+        menu.classList.remove('show');
+      }
+    }
+
+    function handleMenuClick(actionFn) {
+      document.getElementById('dropdown-menu').classList.remove('show');
+      actionFn();
+    }
+
+    /* Reset mit expliziter Bestätigungsabfrage */
     function resetAllData() {
-      if (confirm("Möchtest du den Speicher komplett zurücksetzen? Alle alten Reste werden bereinigt.")) {
+      const confirmed = confirm("Möchtest du wirklich alles zurücksetzen?\n\nAlle Artikel auf deiner Einkaufsliste und zwischengespeicherte Daten werden dabei unwiderruflich gelöscht.");
+      if (confirmed) {
         items = [];
         localStorage.removeItem('local_einkaufsliste');
         broadcastState();
@@ -564,9 +645,6 @@
       closeCategoryModal();
     }
 
-    // ----------------------------------------------------
-    // LAUFWEG-MANAGER: SORTIEREN, UMBENENNEN & LÖSCHEN
-    // ----------------------------------------------------
     function openRouteModal() {
       document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
       renderRouteList();
@@ -607,7 +685,6 @@
       });
     }
 
-    // NEU: Kategorie umbenennen und überall aktualisieren
     function renameCategory(oldName) {
       if (oldName === "Sonstiges") return;
 
@@ -616,7 +693,6 @@
 
       const formattedName = newName.trim().charAt(0).toUpperCase() + newName.trim().slice(1);
 
-      // In beiden Supermärkten (Aldi & Famila) umbenennen
       ["aldi", "famila"].forEach(store => {
         const idx = storeRoutes[store].indexOf(oldName);
         if (idx > -1) {
@@ -624,14 +700,12 @@
         }
       });
 
-      // Alle Artikel aktualisieren, die dieser Kategorie zugeordnet waren
       items.forEach(item => {
         if (item.category === oldName) {
           item.category = formattedName;
         }
       });
 
-      // Im Zuordnungs-Wörterbuch anpassen
       Object.keys(categoryDict).forEach(key => {
         if (categoryDict[key] === oldName) {
           categoryDict[key] = formattedName;
