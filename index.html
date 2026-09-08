@@ -58,7 +58,7 @@
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Dialogfenster */
+    /* Modals */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
@@ -98,13 +98,13 @@
       <div class="status" id="mic-status">Tippe auf das Mikrofon für Daueraufnahme.</div>
     </div>
 
-    <!-- Aktive Artikel geordnet nach Laufweg -->
+    <!-- Aktive Liste nach Kategorien -->
     <div class="card">
       <h2>Einkaufsliste</h2>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
-    <!-- Erledigte Artikel (zuletzt abgehakt ganz oben) -->
+    <!-- Erledigte Artikel -->
     <div class="done-wrapper">
       <div class="done-header" onclick="toggleDoneSection()">
         <span id="done-counter">Erledigte Artikel (0)</span>
@@ -120,16 +120,16 @@
 
   </div>
 
-  <!-- Modal: Laufweg anpassen & Neue Kategorie hinzufügen -->
+  <!-- Modal: Laufweg & Globale Kategorie hinzufügen -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
       <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben:</p>
       <ul class="drag-list" id="drag-container"></ul>
       
-      <!-- NEU: Zusätzliche Kategorie eintragen -->
+      <!-- Neue Kategorie eintragen (gilt immer für BEIDE Supermärkte) -->
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
-        <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen:</label>
+        <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen (gilt für Aldi & Famila):</label>
         <div class="input-row" style="margin-top: 6px;">
           <input type="text" id="new-category-input" placeholder="z. B. Tiefkühlkost, Tiernahrung..." onkeydown="if(event.key==='Enter') addNewCategory()">
           <button class="btn-primary" onclick="addNewCategory()">Hinzufügen</button>
@@ -144,20 +144,20 @@
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird für immer gelernt):</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird dauerhaft gelernt):</p>
       <div class="cat-btn-grid" id="cat-choice-grid"></div>
       <button class="btn-modal" style="background: #90a4ae;" onclick="closeCategoryModal()">Abbrechen</button>
     </div>
   </div>
 
   <script>
-    // 1. Standard-Laufwege je Markt
+    // Standard-Laufwege
     const defaultRoutes = {
       aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
       famila: ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
     };
 
-    // 2. Große Lebensmittel-Datenbank
+    // Große Lebensmittel-Datenbank
     const initialDict = {
       // Gemüse & Obst
       "zucchini": "Gemüse", "aubergine": "Gemüse", "ingwer": "Gemüse", "kartoffeln": "Gemüse", "kartoffel": "Gemüse", 
@@ -354,7 +354,6 @@
 
       doneCounter.textContent = `Erledigte Artikel (${doneItems.length})`;
 
-      // 1. Aktive Artikel nach Supermarkt-Laufweg rendern
       if (activeItems.length === 0) {
         listContainer.innerHTML = "<div style='color: #888;'>Alle Artikel erledigt oder Liste ist leer.</div>";
       } else {
@@ -386,7 +385,6 @@
         });
       }
 
-      // 2. Erledigte Artikel chronologisch
       if (doneItems.length === 0) {
         doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Noch keine abgehakten Artikel.</div>";
       } else {
@@ -465,7 +463,7 @@
     }
 
     // ----------------------------------------------------
-    // LAUFWEG & ZUSÄTZLICHE KATEGORIE
+    // LAUFWEG & GEMEINSAME KATEGORIE-VERWALTUNG
     // ----------------------------------------------------
     function openRouteModal() {
       document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
@@ -495,7 +493,7 @@
       });
     }
 
-    // NEU: Neue Kategorie für den aktiven Markt anlegen
+    // NEU: Trägt eine neue Kategorie automatisch in BEIDE Supermärkte ein!
     function addNewCategory() {
       const input = document.getElementById('new-category-input');
       const val = input.value.trim();
@@ -503,19 +501,21 @@
 
       const formatted = val.charAt(0).toUpperCase() + val.slice(1);
 
-      if (!storeRoutes[activeStore].includes(formatted)) {
-        // Vor "Sonstiges" einfügen oder ans Ende
-        const sonstigesIdx = storeRoutes[activeStore].indexOf("Sonstiges");
-        if (sonstigesIdx > -1) {
-          storeRoutes[activeStore].splice(sonstigesIdx, 0, formatted);
-        } else {
-          storeRoutes[activeStore].push(formatted);
+      ["aldi", "famila"].forEach(store => {
+        if (!storeRoutes[store].includes(formatted)) {
+          const sonstigesIdx = storeRoutes[store].indexOf("Sonstiges");
+          if (sonstigesIdx > -1) {
+            storeRoutes[store].splice(sonstigesIdx, 0, formatted);
+          } else {
+            storeRoutes[store].push(formatted);
+          }
         }
-        renderRouteList();
-        input.value = "";
-      } else {
-        alert("Diese Kategorie existiert bereits!");
-      }
+      });
+
+      saveLocal();
+      renderRouteList();
+      render();
+      input.value = "";
     }
 
     let dragSrcEl = null;
