@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Smarte Einkaufsliste Live</title>
-  <!-- Kostenlose Echtzeit-Live-Synchronisation -->
+  <title>Smarte Einkaufsliste</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { margin: 0; padding: 0 0 100px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Oben fixiert: Supermarkt-Laufweg & Live-Status */
+    /* Oben fixiert: Supermarkt-Laufweg */
     .top-bar {
       position: sticky;
       top: 0;
@@ -32,7 +31,7 @@
     .btn-store { flex: 1; padding: 8px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Unten dauerhaft fixiert: Schlanke Eingabeleiste */
+    /* Unten dauerhaft fixiert: Eingabeleiste */
     .bottom-input-bar {
       position: fixed;
       bottom: 0;
@@ -49,7 +48,7 @@
     .compact-row input[type="text"] {
       flex: 1;
       padding: 9px 12px;
-      font-size: 0.95rem;
+      font-size: 1rem;
       border: 1px solid #90a4ae;
       border-radius: 8px;
       outline: none;
@@ -60,8 +59,8 @@
       background: #fff;
     }
     .btn-add-compact {
-      width: 42px;
-      height: 38px;
+      width: 44px;
+      height: 40px;
       background: #00897b;
       color: white;
       border: none;
@@ -74,7 +73,7 @@
       justify-content: center;
     }
     .btn-mic-compact {
-      height: 38px;
+      height: 40px;
       padding: 0 12px;
       background: #e53935;
       color: white;
@@ -128,7 +127,6 @@
 </head>
 <body>
 
-  <!-- Oben fixiert: Supermarkt-Laufweg & Live-Sync Status -->
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -147,14 +145,11 @@
   </div>
 
   <div class="container">
-
-    <!-- Aktive Artikel -->
     <div class="card">
       <h2>Einkaufsliste</h2>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
-    <!-- Erledigte Artikel -->
     <div class="done-wrapper">
       <div class="done-header" onclick="toggleDoneSection()">
         <span id="done-counter">Erledigte Artikel (0)</span>
@@ -163,49 +158,45 @@
       <div id="done-list" style="display: none;"></div>
     </div>
 
-    <!-- Teilen per Direkt-Link -->
     <div class="card">
-      <button class="btn-share" onclick="shareList()">🔗 Sync-Link kopieren (für PC/Tablet/Partner)</button>
+      <button class="btn-share" onclick="shareList()">🔗 Sync-Link kopieren (für Tablet / Smartphone / PC)</button>
       <div class="status-text" id="share-status" style="text-align: center; margin-top: 6px;"></div>
     </div>
-
   </div>
 
-  <!-- Unten dauerhaft fixiert: Eingabeleiste -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel tippen..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel eingeben..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-compact" id="btn-mic" onclick="toggleVoice()">🎙️ Sprache</button>
       </div>
-      <div class="status-text" id="mic-status">Live-Sync aktiv. Bereit für Eingaben.</div>
+      <div class="status-text" id="mic-status">Bereit für Eingaben.</div>
     </div>
   </div>
 
-  <!-- Modal: Live-Synchronisation / Gruppen-Code -->
+  <!-- Sync Modal -->
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Live-Synchronisation</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Alle Geräte mit demselben Code werden in Echtzeit synchronisiert:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Geräte mit demselben Code gleichen sich automatisch live ab:</p>
       <div style="display: flex; gap: 6px; margin: 10px 0;">
         <input type="text" id="sync-code-input" style="flex:1; padding:10px; border:1px solid #cfd8dc; border-radius:6px; font-weight:bold;">
         <button class="btn-add-compact" style="width: auto; padding: 0 14px; font-size: 0.9rem;" onclick="saveSyncCode()">Verbinden</button>
       </div>
-      <p style="font-size: 0.75rem; color: #78909c;">Tipp: Gib diesen Code am Smartphone, PC und Tablet ein – oder nutze einfach den Teilen-Link!</p>
       <button class="btn-modal" style="background:#90a4ae;" onclick="closeSyncModal()">Schließen</button>
     </div>
   </div>
 
-  <!-- Modal: Laufweg anpassen & Kategorien verwalten -->
+  <!-- Laufweg Modal -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben oder löschen:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben oder Kategorie löschen:</p>
       <ul class="drag-list" id="drag-container"></ul>
 
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
-        <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen:</label>
+        <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie (für beide Märkte):</label>
         <div style="display: flex; gap: 6px; margin-top: 6px;">
           <input type="text" id="new-category-input" style="flex:1; padding:8px; border:1px solid #cfd8dc; border-radius:6px;" placeholder="z. B. Tiefkühlkost..." onkeydown="if(event.key==='Enter') addNewCategory()">
           <button class="btn-add-compact" style="width: auto; padding: 0 12px; font-size: 0.9rem;" onclick="addNewCategory()">Hinzufügen</button>
@@ -216,11 +207,11 @@
     </div>
   </div>
 
-  <!-- Modal: Kategorie für einzelnen Artikel anpassen -->
+  <!-- Kategorie Modal -->
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die Abteilung (wird dauerhaft gespeichert):</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird gelernt):</p>
       <div class="cat-btn-grid" id="cat-choice-grid"></div>
       <button class="btn-modal" style="background: #90a4ae;" onclick="closeCategoryModal()">Abbrechen</button>
     </div>
@@ -233,38 +224,17 @@
     };
 
     const initialDict = {
-      "zucchini": "Gemüse", "aubergine": "Gemüse", "ingwer": "Gemüse", "kartoffeln": "Gemüse", "kartoffel": "Gemüse", 
-      "süßkartoffeln": "Gemüse", "tomaten": "Gemüse", "tomate": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", 
-      "salat": "Gemüse", "eisbergsalat": "Gemüse", "rucola": "Gemüse", "äpfel": "Gemüse", "apfel": "Gemüse", 
-      "bananen": "Gemüse", "banane": "Gemüse", "birnen": "Gemüse", "birne": "Gemüse", "paprika": "Gemüse", 
-      "zwiebeln": "Gemüse", "zwiebel": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse", "karotten": "Gemüse",
-      "brokkoli": "Gemüse", "blumenkohl": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
-      "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "beeren": "Gemüse",
-      "erdbeeren": "Gemüse", "heidelbeeren": "Gemüse", "trauben": "Gemüse", "weintrauben": "Gemüse", "spinat": "Gemüse",
-      "lauch": "Gemüse", "porree": "Gemüse", "radieschen": "Gemüse", "kohlrabi": "Gemüse",
-      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", 
-      "vollkornbrot": "Brot", "toast": "Brot", "toastbrot": "Brot", "roggenmehl": "Brot", "weizenmehl": "Brot", 
-      "dinkelmehl": "Brot", "mehl": "Brot", "hefe": "Brot", "frischhefe": "Brot", "trockenhefe": "Brot", 
-      "backpulver": "Brot", "croissant": "Brot", "laugenstange": "Brot", "haferflocken": "Brot",
-      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", 
-      "gummibärchen": "Süßigkeiten", "bonbons": "Süßigkeiten", "erdnüsse": "Süßigkeiten", "nüsse": "Süßigkeiten", 
-      "salzstangen": "Süßigkeiten", "eis": "Süßigkeiten", "waffeln": "Süßigkeiten",
-      "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", 
-      "bratwurst": "Fleisch und Wurst", "schinken": "Fleisch und Wurst", "kochschinken": "Fleisch und Wurst", 
-      "fleisch": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", 
-      "hähnchenbrust": "Fleisch und Wurst", "rinderhack": "Fleisch und Wurst", "steak": "Fleisch und Wurst", 
-      "lachs": "Fleisch und Wurst", "thunfisch": "Fleisch und Wurst", "forelle": "Fleisch und Wurst", "wiener": "Fleisch und Wurst",
-      "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "vollmilch": "Kühlregal", "hafermilch": "Kühlregal", 
-      "butter": "Kühlregal", "käse": "Kühlregal", "gouda": "Kühlregal", "parmesan": "Kühlregal", "mozzarella": "Kühlregal", 
-      "frischkäse": "Kühlregal", "quark": "Kühlregal", "magerquark": "Kühlregal", "joghurt": "Kühlregal", 
-      "sahne": "Kühlregal", "schlagsahne": "Kühlregal", "saure sahne": "Kühlregal", "schmand": "Kühlregal", 
-      "crème fraîche": "Kühlregal", "feta": "Kühlregal",
-      "wasser": "Getränke", "mineralwasser": "Getränke", "bier": "Getränke", "cola": "Getränke", 
-      "saft": "Getränke", "apfelsaft": "Getränke", "orangensaft": "Getränke", "wein": "Getränke", 
-      "kaffee": "Getränke", "tee": "Getränke",
-      "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", 
-      "shampoo": "Drogerie", "duschgel": "Drogerie", "zahnpasta": "Drogerie", "spülmittel": "Drogerie", 
-      "waschmittel": "Drogerie", "müllbeutel": "Drogerie", "alufolie": "Drogerie", "backpapier": "Drogerie"
+      "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", "tomate": "Gemüse", "tomaten": "Gemüse",
+      "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "apfel": "Gemüse", "äpfel": "Gemüse", "birne": "Gemüse", "birnen": "Gemüse",
+      "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse",
+      "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
+      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
+      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
+      "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", "bratwurst": "Fleisch und Wurst",
+      "schinken": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", "steak": "Fleisch und Wurst",
+      "milch": "Kühlregal", "butter": "Kühlregal", "käse": "Kühlregal", "quark": "Kühlregal", "joghurt": "Kühlregal", "sahne": "Kühlregal", "eier": "Kühlregal", "ei": "Kühlregal",
+      "wasser": "Getränke", "bier": "Getränke", "cola": "Getränke", "saft": "Getränke", "kaffee": "Getränke", "tee": "Getränke",
+      "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", "shampoo": "Drogerie"
     };
 
     let storeRoutes = JSON.parse(JSON.stringify(defaultRoutes));
@@ -273,17 +243,14 @@
     let items = [];
     let editingItemId = null;
 
-    // ----------------------------------------------------
-    // LIVE-SYNCHRONISATION ZWISCHEN ALLEN GERÄTEN
-    // ----------------------------------------------------
+    // Eindeutige Geräte-ID zur Schleifen-Verhinderung
+    const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
     if (!syncCode) {
-      // Automatisch einen eindeutigen Code erstellen, falls noch keiner da ist
       syncCode = "familie_" + Math.random().toString(36).substring(2, 7);
       localStorage.setItem('local_sync_code', syncCode);
     }
 
-    // Code aus Link übernehmen (falls geteilt)
     const urlParams = new URLSearchParams(window.location.search);
     const sharedCode = urlParams.get('sync');
     if (sharedCode) {
@@ -293,14 +260,12 @@
     }
 
     let mqttClient = null;
-    let isBroadcasting = false;
 
     function initLiveSync() {
-      const topic = `einkauf_live_sync/${syncCode}`;
-      
+      const topic = `einkauf_sync_v2/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
-          clientId: 'client_' + Math.random().toString(36).substring(2, 9),
+          clientId: myClientId,
           clean: true,
           connectTimeout: 4000
         });
@@ -311,10 +276,12 @@
         });
 
         mqttClient.on('message', (t, msg) => {
-          if (isBroadcasting) return;
           try {
             const data = JSON.parse(msg.toString());
-            if (data && data.items) {
+            // Nachrichten vom eigenen Gerät ignorieren
+            if (data.sender === myClientId) return;
+
+            if (data && Array.isArray(data.items)) {
               items = data.items;
               if (data.store) activeStore = data.store;
               if (data.routes) storeRoutes = data.routes;
@@ -334,55 +301,35 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        isBroadcasting = true;
-        const topic = `einkauf_live_sync/${syncCode}`;
+        const topic = `einkauf_sync_v2/${syncCode}`;
         const payload = JSON.stringify({
+          sender: myClientId,
           store: activeStore,
           items: items,
           routes: storeRoutes
         });
         mqttClient.publish(topic, payload, { retain: true, qos: 1 });
-        setTimeout(() => { isBroadcasting = false; }, 300);
       }
     }
 
-    function openSyncModal() {
-      document.getElementById('sync-code-input').value = syncCode;
-      document.getElementById('sync-modal').style.display = 'flex';
-    }
-    function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
-    function saveSyncCode() {
-      const val = document.getElementById('sync-code-input').value.trim();
-      if (val) {
-        syncCode = val;
-        localStorage.setItem('local_sync_code', syncCode);
-        location.reload();
-      }
-    }
-
-    // ----------------------------------------------------
-    // DATEN LADEN & SPEICHERN
-    // ----------------------------------------------------
     function initData() {
       const savedDict = localStorage.getItem('local_category_dict');
       if (savedDict) {
         try { Object.assign(categoryDict, JSON.parse(savedDict)); } catch(e) {}
       }
-
       const savedRoutes = localStorage.getItem('local_store_routes');
       if (savedRoutes) {
         try { storeRoutes = JSON.parse(savedRoutes); } catch(e) {}
       }
-
       const savedItems = localStorage.getItem('local_einkaufsliste');
       if (savedItems) {
         try { items = JSON.parse(savedItems); } catch(e) {}
       }
-
       const savedStore = localStorage.getItem('local_einkaufsliste_store');
       if (savedStore) activeStore = savedStore;
 
       switchStoreUI(activeStore);
+      render();
       initLiveSync();
     }
 
@@ -405,51 +352,48 @@
       render();
     }
 
-    // Sprach- & Textfilter
+    // Präziser Sprach- & Textfilter
     function parseAndAdd(rawText) {
-      let text = rawText.toLowerCase();
+      if (!rawText || !rawText.trim()) return;
+      let text = rawText.toLowerCase().trim();
 
       if (text.includes("aufnahme beenden") || text.includes("stop")) {
         stopVoice();
         return;
       }
 
-      if (text.includes("aldi")) switchStoreUI("aldi");
-      if (text.includes("famila")) switchStoreUI("famila");
+      let storeChanged = false;
+      if (text.includes("aldi")) { switchStoreUI("aldi"); storeChanged = true; }
+      if (text.includes("famila")) { switchStoreUI("famila"); storeChanged = true; }
 
-      const phrasesToRemove = [
+      // Phrasen säubern
+      const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
-        "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
-        "kauf bitte", "kaufe bitte", "bring bitte mit", "bring mit", "besorge bitte",
-        "schreib auf", "setz auf die liste", "auf die liste"
+        "ich möchte", "wir möchten", "kauf bitte", "kaufe bitte", 
+        "bring bitte mit", "bring mit", "besorge bitte", "schreib auf"
       ];
+      phrases.forEach(p => { text = text.replaceAll(p, " "); });
 
-      phrasesToRemove.forEach(p => { text = text.replaceAll(p, " "); });
+      // Satz in Wörter teilen
+      const words = text.split(/[\s,.;]+|\sund\s|\ssowie\s/);
+      const stopWords = ["bitte", "noch", "auch", "etwas", "aldi", "famila", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit"];
 
-      const rawWords = text.split(/[\s,.;]+|\sund\s|\ssowie\s|\sauch\s/);
-      const stopWords = [
-        "ich", "du", "wir", "er", "sie", "es", "noch", "auch", "etwas", 
-        "brauche", "brauchen", "kauf", "kaufe", "kaufen", "bitte", 
-        "aldi", "famila", "für", "bei", "den", "die", "das", "ein", "eine", "einen", "einem", "einer"
-      ];
+      words.forEach(w => {
+        const clean = w.trim();
+        if (!clean || stopWords.includes(clean)) return;
 
-      rawWords.forEach(w => {
-        const word = w.trim();
-        if (!word || stopWords.includes(word) || word.length <= 1) return;
+        const cat = categoryDict[clean] || "Sonstiges";
+        const title = clean.charAt(0).toUpperCase() + clean.slice(1);
 
-        const cat = categoryDict[word] || "Sonstiges";
-        const title = word.charAt(0).toUpperCase() + word.slice(1);
-
-        const existingIndex = items.findIndex(i => i.title.toLowerCase() === title.toLowerCase());
-
-        if (existingIndex > -1) {
-          if (items[existingIndex].done) {
-            items[existingIndex].done = false;
-            items[existingIndex].completedAt = null;
+        const existing = items.find(i => i.title.toLowerCase() === clean);
+        if (existing) {
+          if (existing.done) {
+            existing.done = false;
+            existing.completedAt = null;
           }
         } else {
           items.push({
-            id: 'id_' + Date.now() + Math.random().toString(36).substr(2, 4),
+            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 5),
             title: title,
             category: cat,
             done: false,
@@ -499,10 +443,9 @@
       doneCounter.textContent = `Erledigte Artikel (${doneItems.length})`;
 
       if (activeItems.length === 0) {
-        listContainer.innerHTML = "<div style='color: #888;'>Alle Artikel erledigt oder Liste ist leer.</div>";
+        listContainer.innerHTML = "<div style='color: #888;'>Keine aktiven Artikel vorhanden.</div>";
       } else {
         const currentOrder = storeRoutes[activeStore];
-
         currentOrder.forEach(catName => {
           const matching = activeItems.filter(i => i.category === catName);
           if (matching.length === 0) return;
@@ -524,28 +467,21 @@
             `;
             block.appendChild(row);
           });
-
           listContainer.appendChild(block);
         });
       }
 
       if (doneItems.length === 0) {
-        doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Noch keine abgehakten Artikel.</div>";
+        doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Keine abgehakten Artikel.</div>";
       } else {
         doneItems.forEach(item => {
           const row = document.createElement('div');
           row.className = "done-item";
-
-          let timeString = "";
-          if (item.completedAt) {
-            const d = new Date(item.completedAt);
-            timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
-
+          let timeString = item.completedAt ? 'um ' + new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
           row.innerHTML = `
             <input type="checkbox" checked onchange="toggleItem('${item.id}')">
             <span class="title">${item.title}</span>
-            <span class="done-time">${timeString ? 'um ' + timeString : ''} (${item.category})</span>
+            <span class="done-time">${timeString} (${item.category})</span>
             <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
           `;
           doneListContainer.appendChild(row);
@@ -574,15 +510,13 @@
       const grid = document.getElementById('cat-choice-grid');
       grid.innerHTML = "";
 
-      const availableCategories = storeRoutes[activeStore];
-      availableCategories.forEach(cat => {
+      storeRoutes[activeStore].forEach(cat => {
         const btn = document.createElement('button');
         btn.className = "btn-cat-choice";
         btn.textContent = cat;
         btn.onclick = () => assignCategory(cat);
         grid.appendChild(btn);
       });
-
       document.getElementById('category-modal').style.display = 'flex';
     }
 
@@ -613,54 +547,38 @@
       const container = document.getElementById('drag-container');
       container.innerHTML = "";
 
-      const currentOrder = storeRoutes[activeStore];
-
-      currentOrder.forEach((cat, index) => {
+      storeRoutes[activeStore].forEach((cat, index) => {
         const li = document.createElement('li');
         li.className = "drag-item";
         li.draggable = true;
         li.dataset.index = index;
 
         const canDelete = cat !== 'Sonstiges';
-
         li.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="cursor:grab;">☰ ${cat}</span>
           </div>
           <div style="display:flex; align-items:center; gap:12px;">
             <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>
-            ${canDelete ? `<button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0; color:#e53935;" title="Kategorie löschen">🗑️</button>` : `<span style="width:20px;"></span>`}
+            ${canDelete ? `<button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0; color:#e53935;">🗑️</button>` : `<span style="width:20px;"></span>`}
           </div>
         `;
-
         li.addEventListener('dragstart', handleDragStart);
         li.addEventListener('dragover', handleDragOver);
         li.addEventListener('drop', handleDrop);
         li.addEventListener('dragend', handleDragEnd);
-
         container.appendChild(li);
       });
     }
 
     function deleteCategory(catName) {
-      if (catName === "Sonstiges") {
-        alert("Die Kategorie 'Sonstiges' dient als Auffangbecken und kann nicht gelöscht werden.");
-        return;
-      }
-
-      if (confirm(`Möchtest du die Kategorie "${catName}" wirklich für alle Märkte löschen?\nAlle darin befindlichen Artikel werden automatisch nach "Sonstiges" verschoben.`)) {
+      if (catName === "Sonstiges") return;
+      if (confirm(`Kategorie "${catName}" für alle Märkte löschen? Artikel landen in "Sonstiges".`)) {
         ["aldi", "famila"].forEach(store => {
           storeRoutes[store] = storeRoutes[store].filter(c => c !== catName);
         });
-
-        items.forEach(item => {
-          if (item.category === catName) item.category = "Sonstiges";
-        });
-
-        Object.keys(categoryDict).forEach(key => {
-          if (categoryDict[key] === catName) categoryDict[key] = "Sonstiges";
-        });
-
+        items.forEach(i => { if (i.category === catName) i.category = "Sonstiges"; });
+        Object.keys(categoryDict).forEach(k => { if (categoryDict[k] === catName) categoryDict[k] = "Sonstiges"; });
         broadcastState();
         renderRouteList();
         render();
@@ -671,20 +589,15 @@
       const input = document.getElementById('new-category-input');
       const val = input.value.trim();
       if (!val) return;
-
       const formatted = val.charAt(0).toUpperCase() + val.slice(1);
 
       ["aldi", "famila"].forEach(store => {
         if (!storeRoutes[store].includes(formatted)) {
-          const sonstigesIdx = storeRoutes[store].indexOf("Sonstiges");
-          if (sonstigesIdx > -1) {
-            storeRoutes[store].splice(sonstigesIdx, 0, formatted);
-          } else {
-            storeRoutes[store].push(formatted);
-          }
+          const sIdx = storeRoutes[store].indexOf("Sonstiges");
+          if (sIdx > -1) storeRoutes[store].splice(sIdx, 0, formatted);
+          else storeRoutes[store].push(formatted);
         }
       });
-
       broadcastState();
       renderRouteList();
       render();
@@ -692,23 +605,17 @@
     }
 
     let dragSrcEl = null;
-
     function handleDragStart(e) {
-      if (e.target.tagName.toLowerCase() === 'button') {
-        e.preventDefault();
-        return;
-      }
+      if (e.target.tagName.toLowerCase() === 'button') { e.preventDefault(); return; }
       dragSrcEl = this;
       this.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
     }
-
     function handleDragOver(e) {
       if (e.preventDefault) e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       return false;
     }
-
     function handleDrop(e) {
       if (e.stopPropagation) e.stopPropagation();
       if (dragSrcEl !== this && dragSrcEl) {
@@ -716,56 +623,54 @@
         const itemsList = Array.from(container.querySelectorAll('.drag-item'));
         const srcIdx = itemsList.indexOf(dragSrcEl);
         const targetIdx = itemsList.indexOf(this);
-
-        if (srcIdx < targetIdx) {
-          container.insertBefore(dragSrcEl, this.nextSibling);
-        } else {
-          container.insertBefore(dragSrcEl, this);
-        }
+        if (srcIdx < targetIdx) container.insertBefore(dragSrcEl, this.nextSibling);
+        else container.insertBefore(dragSrcEl, this);
       }
       return false;
     }
-
-    function handleDragEnd() {
-      if (this.classList) this.classList.remove('dragging');
-    }
+    function handleDragEnd() { if (this.classList) this.classList.remove('dragging'); }
 
     function saveCustomRoute() {
       const container = document.getElementById('drag-container');
       const itemsList = Array.from(container.querySelectorAll('.drag-item'));
-
-      const newOrder = itemsList.map(li => {
-        return li.querySelector('span').textContent.replace('☰ ', '').trim();
-      });
-
-      storeRoutes[activeStore] = newOrder;
+      storeRoutes[activeStore] = itemsList.map(li => li.querySelector('span').textContent.replace('☰ ', '').trim());
       broadcastState();
       render();
       document.getElementById('route-modal').style.display = 'none';
     }
 
-    // Erzeugt einen gemeinsamen Link mit Live-Code
+    function openSyncModal() {
+      document.getElementById('sync-code-input').value = syncCode;
+      document.getElementById('sync-modal').style.display = 'flex';
+    }
+    function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
+    function saveSyncCode() {
+      const val = document.getElementById('sync-code-input').value.trim();
+      if (val) {
+        syncCode = val;
+        localStorage.setItem('local_sync_code', syncCode);
+        location.reload();
+      }
+    }
+
     function shareList() {
       const shareUrl = window.location.origin + window.location.pathname + '?sync=' + syncCode;
-
       navigator.clipboard.writeText(shareUrl).then(() => {
         const status = document.getElementById('share-status');
-        status.textContent = "Fertig! Live-Link kopiert. Öffne ihn am PC, Tablet oder sende ihn per WhatsApp!";
+        status.textContent = "Sync-Link kopiert! Öffne diesen Link auf deinem Tablet oder Smartphone.";
         setTimeout(() => { status.textContent = ""; }, 5000);
       }).catch(() => {
         prompt("Kopiere diesen Link:", shareUrl);
       });
     }
 
+    // Robuste Spracherkennung
     let recognition = null;
     let keepRecording = false;
 
     function toggleVoice() {
-      if (keepRecording) {
-        stopVoice();
-      } else {
-        startVoice();
-      }
+      if (keepRecording) stopVoice();
+      else startVoice();
     }
 
     function startVoice() {
@@ -774,29 +679,24 @@
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
       if (!SpeechRec) {
-        status.textContent = "Hinweis: Spracherkennung benötigt Google Chrome.";
+        status.textContent = "Spracheingabe benötigt Chrome/Safari.";
         return;
       }
 
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹️ Stopp";
-      status.textContent = "Daueraufnahme aktiv... Sprich frei!";
+      status.textContent = "Höre zu... Sag z. B.: 'Bananen, Milch und Brot'";
 
-      if (!recognition) {
+      try {
         recognition = new SpeechRec();
         recognition.lang = 'de-DE';
-        recognition.continuous = true;
         recognition.interimResults = false;
 
         recognition.onresult = (evt) => {
-          for (let i = evt.resultIndex; i < evt.results.length; i++) {
-            if (evt.results[i].isFinal) {
-              const text = evt.results[i][0].transcript;
-              status.textContent = `Erkannt: "${text}"`;
-              parseAndAdd(text);
-            }
-          }
+          const text = evt.results[0][0].transcript;
+          status.textContent = `Erkannt: "${text}"`;
+          parseAndAdd(text);
         };
 
         recognition.onend = () => {
@@ -808,17 +708,17 @@
           }
         };
 
-        recognition.onerror = (e) => {
-          if (e.error === 'not-allowed') {
-            stopVoice();
-            status.textContent = "Mikrofon verweigert.";
+        recognition.onerror = () => {
+          if (!keepRecording) {
+            micBtn.classList.remove('recording');
+            micBtn.textContent = "🎙️ Sprache";
           }
         };
-      }
 
-      try {
         recognition.start();
-      } catch (e) {}
+      } catch(e) {
+        status.textContent = "Fehler beim Mikrofon-Start.";
+      }
     }
 
     function stopVoice() {
@@ -827,7 +727,7 @@
       const micBtn = document.getElementById('btn-mic');
       micBtn.classList.remove('recording');
       micBtn.textContent = "🎙️ Sprache";
-      status.textContent = "Aufnahme beendet. Bereit.";
+      status.textContent = "Bereit für Eingaben.";
       if (recognition) {
         try { recognition.stop(); } catch(e) {}
       }
