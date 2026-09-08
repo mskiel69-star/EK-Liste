@@ -6,15 +6,29 @@
   <title>Smarte Einkaufsliste</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 14px; background: #eceff1; color: #263238; }
-    .container { max-width: 600px; margin: 0 auto; }
-    .card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); margin-bottom: 14px; }
-    h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #1a237e; }
+    body { margin: 0; padding: 0 0 40px 0; background: #eceff1; color: #263238; }
+    .container { max-width: 600px; margin: 0 auto; padding: 12px; }
     
-    /* Supermarkt-Umschalter */
+    /* Sticky-Leiste: Bleibt beim Scrollen immer oben sichtbar */
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: white;
+      padding: 12px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      border-bottom: 1px solid #cfd8dc;
+    }
+    .store-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .store-header-row h2 { margin: 0; font-size: 1rem; color: #1a237e; }
+    .btn-settings { background: #eceff1; border: 1px solid #b0bec5; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; font-weight: bold; cursor: pointer; }
+    
     .store-bar { display: flex; gap: 8px; }
-    .btn-store { flex: 1; padding: 12px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: 0.15s; }
+    .btn-store { flex: 1; padding: 10px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
+
+    .card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin-bottom: 14px; }
+    h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #1a237e; }
 
     /* Eingaben */
     .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -24,32 +38,56 @@
     .btn-mic.recording { background: #b71c1c; box-shadow: 0 0 12px rgba(229, 57, 53, 0.6); }
     .status { font-size: 0.85rem; color: #546e7a; margin-top: 6px; }
 
-    /* Kategorien & Artikel */
+    /* Einkaufslisten-Gruppen */
     .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
     .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
-    .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+    .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; gap: 8px; }
     .item-row:last-child { border-bottom: none; }
-    .item-row input[type="checkbox"] { width: 22px; height: 22px; margin-right: 12px; cursor: pointer; }
+    .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
     .item-name { flex: 1; font-size: 1.05rem; }
-    .item-name.done { text-decoration: line-through; color: #9e9e9e; }
-    .btn-delete { background: none; border: none; color: #b0bec5; font-size: 1.4rem; cursor: pointer; padding: 0 8px; line-height: 1; }
+    .item-actions { display: flex; gap: 4px; }
+    .btn-icon { background: #f0f0f0; border: 1px solid #cfd8dc; border-radius: 6px; padding: 4px 8px; font-size: 0.9rem; cursor: pointer; }
+    .btn-delete { background: none; border: none; color: #b0bec5; font-size: 1.4rem; cursor: pointer; padding: 0 6px; line-height: 1; }
     .btn-delete:hover { color: #e53935; }
 
-    /* Teilen */
+    /* Erledigte Artikel (Akkordeon) */
+    .done-wrapper { margin-top: 20px; border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; }
+    .done-header { background: #e0e0e0; padding: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; }
+    .done-item:last-child { border-bottom: none; }
+    .done-item span.title { flex: 1; text-decoration: line-through; }
+    .done-time { font-size: 0.75rem; color: #90a4ae; }
+
+    /* Modal / Popups (Laufweg-Sortierung & Kategorie-Wahl) */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
+    .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .drag-list { list-style: none; padding: 0; margin: 12px 0; }
+    .drag-item { background: #f5f5f5; border: 1px solid #cfd8dc; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
+    .drag-item.dragging { opacity: 0.5; background: #e0e0e0; }
+    .btn-modal { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 1rem; }
+    
+    .cat-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+    .btn-cat-choice { padding: 12px 8px; border: 1px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    
     .btn-share { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
+
+  <!-- Sticky Header: Bleibt immer oben sichtbar -->
+  <div class="sticky-header">
+    <div class="store-header-row">
+      <h2>Supermarkt-Laufweg</h2>
+      <button class="btn-settings" onclick="openRouteModal()">⚙️ Laufweg anpassen</button>
+    </div>
+    <div class="store-bar">
+      <button class="btn-store active" id="btn-aldi" onclick="switchStore('aldi')">Aldi</button>
+      <button class="btn-store" id="btn-famila" onclick="switchStore('famila')">Famila</button>
+    </div>
+  </div>
+
   <div class="container">
     
-    <div class="card">
-      <h2>Supermarkt-Laufweg</h2>
-      <div class="store-bar">
-        <button class="btn-store active" id="btn-aldi" onclick="switchStore('aldi')">Aldi</button>
-        <button class="btn-store" id="btn-famila" onclick="switchStore('famila')">Famila</button>
-      </div>
-    </div>
-
     <div class="card">
       <h2>Eingabe (Tastatur & Sprache)</h2>
       <div class="input-row">
@@ -57,48 +95,128 @@
         <button class="btn-primary" onclick="addFromInput()">+</button>
       </div>
       <button class="btn-mic" id="btn-mic" onclick="toggleVoice()">🎙️ Spracheingabe starten</button>
-      <div class="status" id="mic-status">Tippe auf das Mikrofon. Die Aufnahme bleibt an, bis du wieder drückst.</div>
+      <div class="status" id="mic-status">Tippe auf das Mikrofon für Daueraufnahme.</div>
     </div>
 
+    <!-- Aktive Artikel nach Kategorien -->
     <div class="card">
       <h2>Einkaufsliste</h2>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
-    <div class="card">
+    <!-- Abgehakte Artikel im Einklappmenü (chronologisch) -->
+    <div class="done-wrapper">
+      <div class="done-header" onclick="toggleDoneSection()">
+        <span id="done-counter">Erledigte Artikel (0)</span>
+        <span id="done-arrow">▼</span>
+      </div>
+      <div id="done-list" style="display: none;"></div>
+    </div>
+
+    <div class="card" style="margin-top: 14px;">
       <button class="btn-share" onclick="shareList()">🔗 Liste teilen (Link kopieren)</button>
       <div class="status" id="share-status" style="text-align: center;"></div>
     </div>
 
   </div>
 
+  <!-- Modal: Laufweg anpassen (Drag & Drop) -->
+  <div class="modal-overlay" id="route-modal">
+    <div class="modal">
+      <h2 style="margin-top: 0;">Laufweg sortieren (<span id="route-store-title">Aldi</span>)</h2>
+      <p style="font-size: 0.85rem; color: #546e7a;">Halte eine Kategorie gedrückt und ziehe sie an die gewünschte Position:</p>
+      <ul class="drag-list" id="drag-container"></ul>
+      <button class="btn-modal" onclick="saveCustomRoute()">Speichern & Schließen</button>
+    </div>
+  </div>
+
+  <!-- Modal: Kategorie für Artikel anpassen -->
+  <div class="modal-overlay" id="category-modal">
+    <div class="modal">
+      <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
+      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird für die Zukunft gespeichert):</p>
+      <div class="cat-btn-grid" id="cat-choice-grid"></div>
+      <button class="btn-modal" style="background: #90a4ae;" onclick="closeCategoryModal()">Abbrechen</button>
+    </div>
+  </div>
+
   <script>
-    // 1. Deine Laufwege je Supermarkt
-    const storeRoutes = {
-       aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Hygenie", "Knabbersachen", "Kühlregal", "Sonstiges"],
-      famila: ["Getränke", "Gemüse", "Brot", "Süßigkeiten", "Alkohol", "Kaffee", "Knabbersachen", "Kühlregal", "Fleisch und Wurst", "Sonstiges"]
+    // 1. Standard-Laufwege (können in der App per Drag & Drop angepasst werden)
+    const defaultRoutes = {
+      aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
+      famila: ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
     };
 
-    // 2. Zuordnung der Lebensmittel zu den Kategorien
-    const categoryDict = {
+    // 2. Große Lebensmittel-Datenbank (wird durch Benutzerklicks dynamisch erweitert)
+    const initialDict = {
       // Gemüse & Obst
-      "kartoffeln": "Gemüse", "kartoffel": "Gemüse", "tomaten": "Gemüse", "tomate": "Gemüse", 
-      "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "äpfel": "Gemüse", "apfel": "Gemüse", 
-      "bananen": "Gemüse", "banane": "Gemüse", "paprika": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse",
+      "zucchini": "Gemüse", "aubergine": "Gemüse", "ingwer": "Gemüse", "kartoffeln": "Gemüse", "kartoffel": "Gemüse", 
+      "süßkartoffeln": "Gemüse", "tomaten": "Gemüse", "tomate": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", 
+      "salat": "Gemüse", "eisbergsalat": "Gemüse", "rucola": "Gemüse", "äpfel": "Gemüse", "apfel": "Gemüse", 
+      "bananen": "Gemüse", "banane": "Gemüse", "birnen": "Gemüse", "birne": "Gemüse", "paprika": "Gemüse", 
+      "zwiebeln": "Gemüse", "zwiebel": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse", "karotten": "Gemüse",
+      "brokkoli": "Gemüse", "blumenkohl": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
+      "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "beeren": "Gemüse",
+      "erdbeeren": "Gemüse", "heidelbeeren": "Gemüse", "trauben": "Gemüse", "weintrauben": "Gemüse", "spinat": "Gemüse",
+      "lauch": "Gemüse", "porree": "Gemüse", "radieschen": "Gemüse", "kohlrabi": "Gemüse",
+
       // Brot & Backwaren
-      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "toast": "Brot", "mehl": "Brot",
-      // Süßigkeiten
-      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
-      // Fleisch & Wurst
-      "hackfleisch": "Fleisch und Wurst", "salami": "Fleisch und Wurst", "bratwurst": "Fleisch und Wurst", "schinken": "Fleisch und Wurst", "fleisch": "Fleisch und Wurst", "wurst": "Fleisch und Wurst",
-      // Kühlregal
-      "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "butter": "Kühlregal", "käse": "Kühlregal", "quark": "Kühlregal", "joghurt": "Kühlregal", "sahne": "Kühlregal"
+      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", 
+      "vollkornbrot": "Brot", "toast": "Brot", "toastbrot": "Brot", "roggenmehl": "Brot", "weizenmehl": "Brot", 
+      "dinkelmehl": "Brot", "mehl": "Brot", "hefe": "Brot", "frischhefe": "Brot", "trockenhefe": "Brot", 
+      "backpulver": "Brot", "croissant": "Brot", "laugenstange": "Brot", "haferflocken": "Brot",
+
+      // Süßigkeiten & Snacks
+      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", 
+      "gummibärchen": "Süßigkeiten", "bonbons": "Süßigkeiten", "erdnüsse": "Süßigkeiten", "nüsse": "Süßigkeiten", 
+      "salzstangen": "Süßigkeiten", "eis": "Süßigkeiten", "waffeln": "Süßigkeiten",
+
+      // Fleisch, Wurst & Fisch
+      "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", 
+      "bratwurst": "Fleisch und Wurst", "schinken": "Fleisch und Wurst", "kochschinken": "Fleisch und Wurst", 
+      "fleisch": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", 
+      "hähnchenbrust": "Fleisch und Wurst", "rinderhack": "Fleisch und Wurst", "steak": "Fleisch und Wurst", 
+      "lachs": "Fleisch und Wurst", "thunfisch": "Fleisch und Wurst", "forelle": "Fleisch und Wurst", "wiener": "Fleisch und Wurst",
+
+      // Kühlregal & Molkerei
+      "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "vollmilch": "Kühlregal", "hafermilch": "Kühlregal", 
+      "butter": "Kühlregal", "käse": "Kühlregal", "gouda": "Kühlregal", "parmesan": "Kühlregal", "mozzarella": "Kühlregal", 
+      "frischkäse": "Kühlregal", "quark": "Kühlregal", "magerquark": "Kühlregal", "joghurt": "Kühlregal", 
+      "sahne": "Kühlregal", "schlagsahne": "Kühlregal", "saure sahne": "Kühlregal", "schmand": "Kühlregal", 
+      "crème fraîche": "Kühlregal", "creme fraiche": "Kühlregal", "feta": "Kühlregal",
+
+      // Getränke
+      "wasser": "Getränke", "mineralwasser": "Getränke", "sprudel": "Getränke", "bier": "Getränke", 
+      "cola": "Getränke", "saft": "Getränke", "apfelsaft": "Getränke", "orangensaft": "Getränke", "wein": "Getränke", 
+      "rotwein": "Getränke", "weißwein": "Getränke", "kaffee": "Getränke", "tee": "Getränke",
+
+      // Drogerie & Haushalt
+      "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", 
+      "shampoo": "Drogerie", "duschgel": "Drogerie", "zahnpasta": "Drogerie", "zahnbürste": "Drogerie", 
+      "spülmittel": "Drogerie", "waschmittel": "Drogerie", "müllbeutel": "Drogerie", "alufolie": "Drogerie", "backpapier": "Drogerie"
     };
 
+    let storeRoutes = JSON.parse(JSON.stringify(defaultRoutes));
+    let categoryDict = Object.assign({}, initialDict);
     let activeStore = "aldi";
     let items = [];
+    let editingItemId = null;
 
+    // Lokale Daten & Konfigurationen laden
     function initData() {
+      // Benutzerdefinierte Wörterbuch-Erweiterungen laden
+      const savedDict = localStorage.getItem('local_category_dict');
+      if (savedDict) {
+        try { Object.assign(categoryDict, JSON.parse(savedDict)); } catch(e) {}
+      }
+
+      // Benutzerdefinierte Routen laden
+      const savedRoutes = localStorage.getItem('local_store_routes');
+      if (savedRoutes) {
+        try { storeRoutes = JSON.parse(savedRoutes); } catch(e) {}
+      }
+
+      // URL-Import prüfen (Teilen)
       const urlParams = new URLSearchParams(window.location.search);
       const sharedData = urlParams.get('data');
 
@@ -111,19 +229,22 @@
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch(e) {}
       } else {
-        const saved = localStorage.getItem('local_einkaufsliste');
-        if (saved) {
-          try { items = JSON.parse(saved); } catch(e) {}
+        const savedItems = localStorage.getItem('local_einkaufsliste');
+        if (savedItems) {
+          try { items = JSON.parse(savedItems); } catch(e) {}
         }
         const savedStore = localStorage.getItem('local_einkaufsliste_store');
         if (savedStore) activeStore = savedStore;
       }
+
       switchStore(activeStore);
     }
 
     function saveLocal() {
       localStorage.setItem('local_einkaufsliste', JSON.stringify(items));
       localStorage.setItem('local_einkaufsliste_store', activeStore);
+      localStorage.setItem('local_store_routes', JSON.stringify(storeRoutes));
+      localStorage.setItem('local_category_dict', JSON.stringify(categoryDict));
     }
 
     function switchStore(name) {
@@ -134,21 +255,18 @@
       render();
     }
 
-    // Verbesserter Text- und Sprachfilter
+    // Sprach- & Fließtext-Parser mit Reaktivierung bereits erledigter Artikel
     function parseAndAdd(rawText) {
       let text = rawText.toLowerCase();
 
-      // Aufnahme per Sprache beenden
       if (text.includes("aufnahme beenden") || text.includes("stop")) {
         stopVoice();
         return;
       }
 
-      // Marktwechsel erkennen
       if (text.includes("aldi")) switchStore("aldi");
       if (text.includes("famila")) switchStore("famila");
 
-      // 1. Ganze Phrasen und Satzbausteine herausfiltern
       const phrasesToRemove = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
         "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
@@ -156,14 +274,9 @@
         "schreib auf", "setz auf die liste", "auf die liste"
       ];
 
-      phrasesToRemove.forEach(p => {
-        text = text.replaceAll(p, " ");
-      });
+      phrasesToRemove.forEach(p => { text = text.replaceAll(p, " "); });
 
-      // 2. Fließtext an Trennwörtern und Satzzeichen aufteilen
       const rawWords = text.split(/[\s,.;]+|\sund\s|\ssowie\s|\sauch\s/);
-
-      // 3. Einzelne Rest-Füllwörter herausfiltern
       const stopWords = [
         "ich", "du", "wir", "er", "sie", "es", "noch", "auch", "etwas", 
         "brauche", "brauchen", "kauf", "kaufe", "kaufen", "bitte", 
@@ -174,18 +287,26 @@
         const word = w.trim();
         if (!word || stopWords.includes(word) || word.length <= 1) return;
 
-        // Artikel zuweisen
         const cat = categoryDict[word] || "Sonstiges";
         const title = word.charAt(0).toUpperCase() + word.slice(1);
 
-        // Prüfen, ob der Artikel schon auf der Liste steht
-        const exists = items.some(i => i.title.toLowerCase() === title.toLowerCase());
-        if (!exists) {
+        // Prüfen, ob der Artikel bereits existiert
+        const existingIndex = items.findIndex(i => i.title.toLowerCase() === title.toLowerCase());
+
+        if (existingIndex > -1) {
+          // Reaktivieren, falls er bereits abgehakt war
+          if (items[existingIndex].done) {
+            items[existingIndex].done = false;
+            items[existingIndex].completedAt = null;
+          }
+        } else {
+          // Neu eintragen
           items.push({
             id: 'id_' + Date.now() + Math.random().toString(36).substr(2, 4),
             title: title,
             category: cat,
-            done: false
+            done: false,
+            completedAt: null
           });
         }
       });
@@ -202,10 +323,13 @@
       }
     }
 
+    // Artikel abhaken oder reaktivieren
     function toggleItem(id) {
       const item = items.find(i => i.id === id);
       if (item) {
         item.done = !item.done;
+        // Zuletzt abgehakter Artikel erhält aktuellen Zeitstempel
+        item.completedAt = item.done ? Date.now() : null;
         saveLocal();
         render();
       }
@@ -217,40 +341,209 @@
       render();
     }
 
+    // Darstellung aufteilen: Aktiv (nach Markt) vs. Erledigt (chronologisch)
     function render() {
-      const container = document.getElementById('list-container');
-      container.innerHTML = "";
+      const listContainer = document.getElementById('list-container');
+      const doneListContainer = document.getElementById('done-list');
+      const doneCounter = document.getElementById('done-counter');
+      listContainer.innerHTML = "";
+      doneListContainer.innerHTML = "";
 
-      if (items.length === 0) {
-        container.innerHTML = "<div style='color: #888;'>Keine Artikel auf der Liste.</div>";
-        return;
+      const activeItems = items.filter(i => !i.done);
+      // Erledigte Artikel: Neueste oben (nach Zeitstempel sortiert)
+      const doneItems = items.filter(i => i.done).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+
+      doneCounter.textContent = `Erledigte Artikel (${doneItems.length})`;
+
+      // 1. Aktive Liste nach Supermarkt-Kategorien rendern
+      if (activeItems.length === 0) {
+        listContainer.innerHTML = "<div style='color: #888;'>Alle Artikel erledigt oder Liste ist leer.</div>";
+      } else {
+        const currentOrder = storeRoutes[activeStore];
+
+        currentOrder.forEach(catName => {
+          const matching = activeItems.filter(i => i.category === catName);
+          if (matching.length === 0) return;
+
+          const block = document.createElement('div');
+          block.className = "cat-block";
+          block.innerHTML = `<div class="cat-header">${catName}</div>`;
+
+          matching.forEach(item => {
+            const row = document.createElement('div');
+            row.className = "item-row";
+            row.innerHTML = `
+              <input type="checkbox" onchange="toggleItem('${item.id}')">
+              <span class="item-name">${item.title}</span>
+              <div class="item-actions">
+                <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
+                <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
+              </div>
+            `;
+            block.appendChild(row);
+          });
+
+          listContainer.appendChild(block);
+        });
       }
+
+      // 2. Erledigte Artikel chronologisch rendern
+      if (doneItems.length === 0) {
+        doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Noch keine abgehakten Artikel.</div>";
+      } else {
+        doneItems.forEach(item => {
+          const row = document.createElement('div');
+          row.className = "done-item";
+
+          let timeString = "";
+          if (item.completedAt) {
+            const d = new Date(item.completedAt);
+            timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+
+          row.innerHTML = `
+            <input type="checkbox" checked onchange="toggleItem('${item.id}')">
+            <span class="title">${item.title}</span>
+            <span class="done-time">${timeString ? 'um ' + timeString : ''} (${item.category})</span>
+            <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
+          `;
+          doneListContainer.appendChild(row);
+        });
+      }
+    }
+
+    // Einklapp-Menü für erledigte Artikel steuern
+    function toggleDoneSection() {
+      const el = document.getElementById('done-list');
+      const arrow = document.getElementById('done-arrow');
+      if (el.style.display === 'none') {
+        el.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        el.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+
+    // ----------------------------------------------------
+    // KATEGORIE PRO ARTIKEL ÄNDERN & FÜR IMMER LERNEN
+    // ----------------------------------------------------
+    function openCategoryModal(itemId) {
+      editingItemId = itemId;
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('change-item-title').textContent = item.title;
+      const grid = document.getElementById('cat-choice-grid');
+      grid.innerHTML = "";
+
+      const availableCategories = storeRoutes[activeStore];
+      availableCategories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = "btn-cat-choice";
+        btn.textContent = cat;
+        btn.onclick = () => assignCategory(cat);
+        grid.appendChild(btn);
+      });
+
+      document.getElementById('category-modal').style.display = 'flex';
+    }
+
+    function closeCategoryModal() {
+      document.getElementById('category-modal').style.display = 'none';
+      editingItemId = null;
+    }
+
+    function assignCategory(newCategory) {
+      if (!editingItemId) return;
+      const item = items.find(i => i.id === editingItemId);
+      if (item) {
+        item.category = newCategory;
+        // Im Wörterbuch für die Zukunft abspeichern
+        categoryDict[item.title.toLowerCase()] = newCategory;
+        saveLocal();
+        render();
+      }
+      closeCategoryModal();
+    }
+
+    // ----------------------------------------------------
+    // LAUFWEG PER DRAG & DROP ANPASSEN
+    // ----------------------------------------------------
+    function openRouteModal() {
+      document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
+      const container = document.getElementById('drag-container');
+      container.innerHTML = "";
 
       const currentOrder = storeRoutes[activeStore];
 
-      currentOrder.forEach(catName => {
-        const matching = items.filter(i => i.category === catName);
-        if (matching.length === 0) return;
+      currentOrder.forEach((cat, index) => {
+        const li = document.createElement('li');
+        li.className = "drag-item";
+        li.draggable = true;
+        li.dataset.index = index;
+        li.innerHTML = `<span>☰ ${cat}</span> <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>`;
 
-        const block = document.createElement('div');
-        block.className = "cat-block";
-        block.innerHTML = `<div class="cat-header">${catName}</div>`;
+        li.addEventListener('dragstart', handleDragStart);
+        li.addEventListener('dragover', handleDragOver);
+        li.addEventListener('drop', handleDrop);
+        li.addEventListener('dragend', handleDragEnd);
 
-        matching.forEach(item => {
-          const row = document.createElement('div');
-          row.className = "item-row";
-          row.innerHTML = `
-            <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleItem('${item.id}')">
-            <span class="item-name ${item.done ? 'done' : ''}">${item.title}</span>
-            <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
-          `;
-          block.appendChild(row);
-        });
-
-        container.appendChild(block);
+        container.appendChild(li);
       });
+
+      document.getElementById('route-modal').style.display = 'flex';
     }
 
+    let dragSrcEl = null;
+
+    function handleDragStart(e) {
+      dragSrcEl = this;
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e) {
+      if (e.preventDefault) e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDrop(e) {
+      if (e.stopPropagation) e.stopPropagation();
+      if (dragSrcEl !== this) {
+        const container = document.getElementById('drag-container');
+        const itemsList = Array.from(container.querySelectorAll('.drag-item'));
+        const srcIdx = itemsList.indexOf(dragSrcEl);
+        const targetIdx = itemsList.indexOf(this);
+
+        if (srcIdx < targetIdx) {
+          container.insertBefore(dragSrcEl, this.nextSibling);
+        } else {
+          container.insertBefore(dragSrcEl, this);
+        }
+      }
+      return false;
+    }
+
+    function handleDragEnd() {
+      this.classList.remove('dragging');
+    }
+
+    function saveCustomRoute() {
+      const container = document.getElementById('drag-container');
+      const itemsList = Array.from(container.querySelectorAll('.drag-item span:first-child'));
+      const newOrder = itemsList.map(el => el.textContent.replace('☰ ', '').trim());
+
+      storeRoutes[activeStore] = newOrder;
+      saveLocal();
+      render();
+      document.getElementById('route-modal').style.display = 'none';
+    }
+
+    // ----------------------------------------------------
+    // TEILEN-FUNKTION
+    // ----------------------------------------------------
     function shareList() {
       const payload = { store: activeStore, items: items };
       const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -266,7 +559,7 @@
     }
 
     // ----------------------------------------------------
-    // DAUERHAFTE SPRACHAUFNAHME (Bleibt an bis zum Knopfdruck)
+    // DAUERHAFTE SPRACHAUFNAHME
     // ----------------------------------------------------
     let recognition = null;
     let keepRecording = false;
@@ -292,7 +585,7 @@
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹️ Aufnahme beenden (Drücken zum Stoppen)";
-      status.textContent = "Daueraufnahme aktiv... Sprich frei! (z.B. 'Ich brauche Kartoffeln und ich brauche Eier')";
+      status.textContent = "Daueraufnahme aktiv... Sprich frei! (z. B. 'Zucchini, Roggenmehl und Butter')";
 
       if (!recognition) {
         recognition = new SpeechRec();
@@ -310,7 +603,6 @@
           }
         };
 
-        // Automatischer Wiederanlauf, falls der Browser nach einer Pause trennt
         recognition.onend = () => {
           if (keepRecording) {
             try { recognition.start(); } catch(e) {}
@@ -330,9 +622,7 @@
 
       try {
         recognition.start();
-      } catch (e) {
-        // Falls bereits gestartet
-      }
+      } catch (e) {}
     }
 
     function stopVoice() {
