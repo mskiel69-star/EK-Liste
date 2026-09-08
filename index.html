@@ -7,10 +7,10 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 0 0 100px 0; background: #eceff1; color: #263238; }
+    body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Oben fixiert: Supermarkt-Laufweg */
+    /* Fixierte Kopfleiste: Laufweg & Status */
     .top-bar {
       position: sticky;
       top: 0;
@@ -31,7 +31,7 @@
     .btn-store { flex: 1; padding: 8px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Unten dauerhaft fixiert: Eingabeleiste */
+    /* Dauerhaft unten fixierte, kompakte Eingabe */
     .bottom-input-bar {
       position: fixed;
       bottom: 0;
@@ -47,7 +47,7 @@
     .compact-row { display: flex; gap: 6px; align-items: center; }
     .compact-row input[type="text"] {
       flex: 1;
-      padding: 9px 12px;
+      padding: 10px 12px;
       font-size: 1rem;
       border: 1px solid #90a4ae;
       border-radius: 8px;
@@ -60,20 +60,20 @@
     }
     .btn-add-compact {
       width: 44px;
-      height: 40px;
+      height: 42px;
       background: #00897b;
       color: white;
       border: none;
       border-radius: 8px;
       font-weight: bold;
-      font-size: 1.3rem;
+      font-size: 1.4rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .btn-mic-compact {
-      height: 40px;
+      height: 42px;
       padding: 0 12px;
       background: #e53935;
       color: white;
@@ -127,6 +127,7 @@
 </head>
 <body>
 
+  <!-- Oben fixiert: Supermarkt-Laufweg & Live-Sync Status -->
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -164,10 +165,11 @@
     </div>
   </div>
 
+  <!-- Unten dauerhaft fixierte Eingabeleiste -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel eingeben..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel tippen (z. B. Bananen)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-compact" id="btn-mic" onclick="toggleVoice()">🎙️ Sprache</button>
       </div>
@@ -179,7 +181,7 @@
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Live-Synchronisation</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Geräte mit demselben Code gleichen sich automatisch live ab:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Geräte mit demselben Code gleichen sich automatisch in Echtzeit ab:</p>
       <div style="display: flex; gap: 6px; margin: 10px 0;">
         <input type="text" id="sync-code-input" style="flex:1; padding:10px; border:1px solid #cfd8dc; border-radius:6px; font-weight:bold;">
         <button class="btn-add-compact" style="width: auto; padding: 0 14px; font-size: 0.9rem;" onclick="saveSyncCode()">Verbinden</button>
@@ -227,8 +229,9 @@
       "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", "tomate": "Gemüse", "tomaten": "Gemüse",
       "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "apfel": "Gemüse", "äpfel": "Gemüse", "birne": "Gemüse", "birnen": "Gemüse",
       "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse",
-      "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
-      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
+      "karotten": "Gemüse", "brokkoli": "Gemüse", "blumenkohl": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
+      "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "spinat": "Gemüse", "lauch": "Gemüse", "porree": "Gemüse",
+      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
       "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
       "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", "bratwurst": "Fleisch und Wurst",
       "schinken": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", "steak": "Fleisch und Wurst",
@@ -243,7 +246,6 @@
     let items = [];
     let editingItemId = null;
 
-    // Eindeutige Geräte-ID zur Schleifen-Verhinderung
     const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
     if (!syncCode) {
@@ -262,7 +264,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_sync_v2/${syncCode}`;
+      const topic = `einkauf_live_v3/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -278,7 +280,6 @@
         mqttClient.on('message', (t, msg) => {
           try {
             const data = JSON.parse(msg.toString());
-            // Nachrichten vom eigenen Gerät ignorieren
             if (data.sender === myClientId) return;
 
             if (data && Array.isArray(data.items)) {
@@ -301,7 +302,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_sync_v2/${syncCode}`;
+        const topic = `einkauf_live_v3/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -352,7 +353,7 @@
       render();
     }
 
-    // Präziser Sprach- & Textfilter
+    // Präziser Sprach- und Textfilter (Kein Verschlucken von Wörtern wie Bananen mehr!)
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
       let text = rawText.toLowerCase().trim();
@@ -362,23 +363,25 @@
         return;
       }
 
-      let storeChanged = false;
-      if (text.includes("aldi")) { switchStoreUI("aldi"); storeChanged = true; }
-      if (text.includes("famila")) { switchStoreUI("famila"); storeChanged = true; }
+      if (text.includes("aldi")) switchStoreUI("aldi");
+      if (text.includes("famila")) switchStoreUI("famila");
 
-      // Phrasen säubern
+      // Satzbausteine herausfiltern
       const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
         "ich möchte", "wir möchten", "kauf bitte", "kaufe bitte", 
-        "bring bitte mit", "bring mit", "besorge bitte", "schreib auf"
+        "bring bitte mit", "bring mit", "besorge bitte", "schreib auf", "setz auf die liste"
       ];
       phrases.forEach(p => { text = text.replaceAll(p, " "); });
 
-      // Satz in Wörter teilen
-      const words = text.split(/[\s,.;]+|\sund\s|\ssowie\s/);
-      const stopWords = ["bitte", "noch", "auch", "etwas", "aldi", "famila", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit"];
+      // Satzzeichen durch Leerzeichen ersetzen
+      text = text.replace(/[,;.:!?]/g, ' ');
 
-      words.forEach(w => {
+      // Wörter zerlegen
+      const rawWords = text.split(/\s+/);
+      const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "aldi", "famila", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit"];
+
+      rawWords.forEach(w => {
         const clean = w.trim();
         if (!clean || stopWords.includes(clean)) return;
 
@@ -430,6 +433,7 @@
       render();
     }
 
+    // Zuverlässige Darstellung: Garantiert, dass jeder Artikel sichtbar ist
     function render() {
       const listContainer = document.getElementById('list-container');
       const doneListContainer = document.getElementById('done-list');
@@ -445,30 +449,26 @@
       if (activeItems.length === 0) {
         listContainer.innerHTML = "<div style='color: #888;'>Keine aktiven Artikel vorhanden.</div>";
       } else {
-        const currentOrder = storeRoutes[activeStore];
+        const currentOrder = [...storeRoutes[activeStore]];
+        if (!currentOrder.includes("Sonstiges")) currentOrder.push("Sonstiges");
+
+        const renderedCategorySet = new Set();
+
         currentOrder.forEach(catName => {
           const matching = activeItems.filter(i => i.category === catName);
           if (matching.length === 0) return;
 
-          const block = document.createElement('div');
-          block.className = "cat-block";
-          block.innerHTML = `<div class="cat-header">${catName}</div>`;
-
-          matching.forEach(item => {
-            const row = document.createElement('div');
-            row.className = "item-row";
-            row.innerHTML = `
-              <input type="checkbox" onchange="toggleItem('${item.id}')">
-              <span class="item-name">${item.title}</span>
-              <div class="item-actions">
-                <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
-                <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
-              </div>
-            `;
-            block.appendChild(row);
-          });
+          renderedCategorySet.add(catName);
+          const block = createCategoryBlock(catName, matching);
           listContainer.appendChild(block);
         });
+
+        // Auffangnetz: Artikel mit unbekannten Kategorien werden trotzdem sofort angezeigt
+        const leftover = activeItems.filter(i => !renderedCategorySet.has(i.category));
+        if (leftover.length > 0) {
+          const block = createCategoryBlock("Sonstiges", leftover);
+          listContainer.appendChild(block);
+        }
       }
 
       if (doneItems.length === 0) {
@@ -487,6 +487,27 @@
           doneListContainer.appendChild(row);
         });
       }
+    }
+
+    function createCategoryBlock(catName, itemList) {
+      const block = document.createElement('div');
+      block.className = "cat-block";
+      block.innerHTML = `<div class="cat-header">${catName}</div>`;
+
+      itemList.forEach(item => {
+        const row = document.createElement('div');
+        row.className = "item-row";
+        row.innerHTML = `
+          <input type="checkbox" onchange="toggleItem('${item.id}')">
+          <span class="item-name">${item.title}</span>
+          <div class="item-actions">
+            <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
+            <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
+          </div>
+        `;
+        block.appendChild(row);
+      });
+      return block;
     }
 
     function toggleDoneSection() {
@@ -664,7 +685,7 @@
       });
     }
 
-    // Robuste Spracherkennung
+    // Spracherkennung
     let recognition = null;
     let keepRecording = false;
 
@@ -717,7 +738,7 @@
 
         recognition.start();
       } catch(e) {
-        status.textContent = "Fehler beim Mikrofon-Start.";
+        status.textContent = "Fehler beim Start.";
       }
     }
 
