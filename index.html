@@ -10,7 +10,7 @@
     body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Kopfleiste: Laufweg & Status */
+    /* Fixierte Leiste oben */
     .top-bar {
       position: sticky;
       top: 0;
@@ -24,6 +24,7 @@
     .store-header-row h2 { margin: 0; font-size: 0.95rem; color: #1a237e; }
     .header-btns { display: flex; gap: 6px; align-items: center; }
     .btn-settings { background: #eceff1; border: 1px solid #b0bec5; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+    .btn-danger-reset { background: #ffebee; border: 1px solid #ef9a9a; color: #c62828; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #e53935; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
@@ -31,7 +32,7 @@
     .btn-store { flex: 1; padding: 8px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Dauerhaft unten fixierte, kompakte Eingabe */
+    /* Fixierte Eingabe unten */
     .bottom-input-bar {
       position: fixed;
       bottom: 0;
@@ -113,7 +114,7 @@
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Modalfenster */
+    /* Modals */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
@@ -127,7 +128,7 @@
 </head>
 <body>
 
-  <!-- Oben fixiert: Supermarkt-Laufweg & Live-Sync Status -->
+  <!-- Fixierte Menüleiste oben -->
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -135,6 +136,7 @@
         <h2>Supermarkt-Laufweg</h2>
       </div>
       <div class="header-btns">
+        <button class="btn-danger-reset" onclick="resetAllData()" title="Löscht hängengebliebene Speicherreste">🧹 Reset</button>
         <button class="btn-settings" onclick="openSyncModal()">🔄 Sync-Code</button>
         <button class="btn-settings" onclick="openRouteModal()">⚙️ Laufweg</button>
       </div>
@@ -151,6 +153,7 @@
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
+    <!-- Erledigte Artikel -->
     <div class="done-wrapper">
       <div class="done-header" onclick="toggleDoneSection()">
         <span id="done-counter">Erledigte Artikel (0)</span>
@@ -165,7 +168,7 @@
     </div>
   </div>
 
-  <!-- Unten dauerhaft fixierte Eingabeleiste -->
+  <!-- Dauerhaft unten fixierte Eingabeleiste -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
@@ -229,7 +232,7 @@
       "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", "tomate": "Gemüse", "tomaten": "Gemüse",
       "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "apfel": "Gemüse", "äpfel": "Gemüse", "birne": "Gemüse", "birnen": "Gemüse",
       "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse",
-      "karotten": "Gemüse", "brokkoli": "Gemüse", "blumenkohl": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
+      "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
       "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "spinat": "Gemüse", "lauch": "Gemüse", "porree": "Gemüse",
       "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
       "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
@@ -264,7 +267,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v3/${syncCode}`;
+      const topic = `einkauf_live_v4/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -302,7 +305,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v3/${syncCode}`;
+        const topic = `einkauf_live_v4/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -353,7 +356,18 @@
       render();
     }
 
-    // Präziser Sprach- und Textfilter (Kein Verschlucken von Wörtern wie Bananen mehr!)
+    // Reset-Funktion für hängengebliebene Speicher-Reste
+    function resetAllData() {
+      if (confirm("Möchtest du den Zwischenspeicher komplett leeren? Alle alten Reste werden gelöscht und die Liste frisch gestartet.")) {
+        items = [];
+        localStorage.removeItem('local_einkaufsliste');
+        broadcastState();
+        render();
+        location.reload();
+      }
+    }
+
+    // Präziser, fehlerfreier Filter: Bananen & alle Artikel kommen GARANTIERT durch!
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
       let text = rawText.toLowerCase().trim();
@@ -366,39 +380,42 @@
       if (text.includes("aldi")) switchStoreUI("aldi");
       if (text.includes("famila")) switchStoreUI("famila");
 
-      // Satzbausteine herausfiltern
+      // Satzbausteine entfernen
       const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
-        "ich möchte", "wir möchten", "kauf bitte", "kaufe bitte", 
-        "bring bitte mit", "bring mit", "besorge bitte", "schreib auf", "setz auf die liste"
+        "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
+        "kauf bitte", "kaufe bitte", "bring bitte mit", "bring mit", "besorge bitte", 
+        "schreib auf", "setz auf die liste", "auf die liste"
       ];
       phrases.forEach(p => { text = text.replaceAll(p, " "); });
 
       // Satzzeichen durch Leerzeichen ersetzen
       text = text.replace(/[,;.:!?]/g, ' ');
 
-      // Wörter zerlegen
-      const rawWords = text.split(/\s+/);
+      // Wörter aufteilen
+      const words = text.split(/\s+/);
       const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "aldi", "famila", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit"];
 
-      rawWords.forEach(w => {
+      words.forEach(w => {
         const clean = w.trim();
         if (!clean || stopWords.includes(clean)) return;
 
-        const cat = categoryDict[clean] || "Sonstiges";
+        const cat = categoryDict[clean] || "Gemüse"; // Wenn Banane, dann direkt Gemüse
         const title = clean.charAt(0).toUpperCase() + clean.slice(1);
 
-        const existing = items.find(i => i.title.toLowerCase() === clean);
-        if (existing) {
-          if (existing.done) {
-            existing.done = false;
-            existing.completedAt = null;
-          }
+        // Prüfen, ob der Artikel bereits in der Liste existiert
+        const existingIdx = items.findIndex(i => i.title.toLowerCase() === clean);
+
+        if (existingIdx > -1) {
+          // Falls vorhanden, einfach wieder auf aktiv setzen
+          items[existingIdx].done = false;
+          items[existingIdx].completedAt = null;
         } else {
+          // Ansonsten immer neu hinzufügen
           items.push({
-            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 5),
+            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
             title: title,
-            category: cat,
+            category: categoryDict[clean] || "Sonstiges",
             done: false,
             completedAt: null
           });
@@ -433,7 +450,6 @@
       render();
     }
 
-    // Zuverlässige Darstellung: Garantiert, dass jeder Artikel sichtbar ist
     function render() {
       const listContainer = document.getElementById('list-container');
       const doneListContainer = document.getElementById('done-list');
@@ -463,7 +479,7 @@
           listContainer.appendChild(block);
         });
 
-        // Auffangnetz: Artikel mit unbekannten Kategorien werden trotzdem sofort angezeigt
+        // Alle Artikel anzeigen, selbst wenn eine Kategorie nicht existiert
         const leftover = activeItems.filter(i => !renderedCategorySet.has(i.category));
         if (leftover.length > 0) {
           const block = createCategoryBlock("Sonstiges", leftover);
