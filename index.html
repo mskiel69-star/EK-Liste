@@ -9,7 +9,7 @@
     body { margin: 0; padding: 0 0 40px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
     
-    /* Sticky-Leiste: Bleibt beim Scrollen immer oben sichtbar */
+    /* Feste Kopfzeile für den Laufweg */
     .sticky-header {
       position: sticky;
       top: 0;
@@ -50,7 +50,7 @@
     .btn-delete { background: none; border: none; color: #b0bec5; font-size: 1.4rem; cursor: pointer; padding: 0 6px; line-height: 1; }
     .btn-delete:hover { color: #e53935; }
 
-    /* Erledigte Artikel (Akkordeon) */
+    /* Erledigte Artikel */
     .done-wrapper { margin-top: 20px; border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; }
     .done-header { background: #e0e0e0; padding: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; }
@@ -58,7 +58,7 @@
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Modal / Popups (Laufweg-Sortierung & Kategorie-Wahl) */
+    /* Dialogfenster */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
@@ -74,7 +74,7 @@
 </head>
 <body>
 
-  <!-- Sticky Header: Bleibt immer oben sichtbar -->
+  <!-- Fixierte Leiste oben -->
   <div class="sticky-header">
     <div class="store-header-row">
       <h2>Supermarkt-Laufweg</h2>
@@ -98,13 +98,13 @@
       <div class="status" id="mic-status">Tippe auf das Mikrofon für Daueraufnahme.</div>
     </div>
 
-    <!-- Aktive Artikel nach Kategorien -->
+    <!-- Aktive Artikel geordnet nach Laufweg -->
     <div class="card">
       <h2>Einkaufsliste</h2>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
-    <!-- Abgehakte Artikel im Einklappmenü (chronologisch) -->
+    <!-- Erledigte Artikel (zuletzt abgehakt ganz oben) -->
     <div class="done-wrapper">
       <div class="done-header" onclick="toggleDoneSection()">
         <span id="done-counter">Erledigte Artikel (0)</span>
@@ -120,34 +120,44 @@
 
   </div>
 
-  <!-- Modal: Laufweg anpassen (Drag & Drop) -->
+  <!-- Modal: Laufweg anpassen & Neue Kategorie hinzufügen -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
-      <h2 style="margin-top: 0;">Laufweg sortieren (<span id="route-store-title">Aldi</span>)</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Halte eine Kategorie gedrückt und ziehe sie an die gewünschte Position:</p>
+      <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
+      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben:</p>
       <ul class="drag-list" id="drag-container"></ul>
+      
+      <!-- NEU: Zusätzliche Kategorie eintragen -->
+      <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
+        <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen:</label>
+        <div class="input-row" style="margin-top: 6px;">
+          <input type="text" id="new-category-input" placeholder="z. B. Tiefkühlkost, Tiernahrung..." onkeydown="if(event.key==='Enter') addNewCategory()">
+          <button class="btn-primary" onclick="addNewCategory()">Hinzufügen</button>
+        </div>
+      </div>
+
       <button class="btn-modal" onclick="saveCustomRoute()">Speichern & Schließen</button>
     </div>
   </div>
 
-  <!-- Modal: Kategorie für Artikel anpassen -->
+  <!-- Modal: Kategorie für einzelnen Artikel anpassen -->
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird für die Zukunft gespeichert):</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Wähle die passende Abteilung (wird für immer gelernt):</p>
       <div class="cat-btn-grid" id="cat-choice-grid"></div>
       <button class="btn-modal" style="background: #90a4ae;" onclick="closeCategoryModal()">Abbrechen</button>
     </div>
   </div>
 
   <script>
-    // 1. Standard-Laufwege (können in der App per Drag & Drop angepasst werden)
+    // 1. Standard-Laufwege je Markt
     const defaultRoutes = {
       aldi: ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
       famila: ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
     };
 
-    // 2. Große Lebensmittel-Datenbank (wird durch Benutzerklicks dynamisch erweitert)
+    // 2. Große Lebensmittel-Datenbank
     const initialDict = {
       // Gemüse & Obst
       "zucchini": "Gemüse", "aubergine": "Gemüse", "ingwer": "Gemüse", "kartoffeln": "Gemüse", "kartoffel": "Gemüse", 
@@ -178,22 +188,22 @@
       "hähnchenbrust": "Fleisch und Wurst", "rinderhack": "Fleisch und Wurst", "steak": "Fleisch und Wurst", 
       "lachs": "Fleisch und Wurst", "thunfisch": "Fleisch und Wurst", "forelle": "Fleisch und Wurst", "wiener": "Fleisch und Wurst",
 
-      // Kühlregal & Molkerei
+      // Kühlregal
       "eier": "Kühlregal", "ei": "Kühlregal", "milch": "Kühlregal", "vollmilch": "Kühlregal", "hafermilch": "Kühlregal", 
       "butter": "Kühlregal", "käse": "Kühlregal", "gouda": "Kühlregal", "parmesan": "Kühlregal", "mozzarella": "Kühlregal", 
       "frischkäse": "Kühlregal", "quark": "Kühlregal", "magerquark": "Kühlregal", "joghurt": "Kühlregal", 
       "sahne": "Kühlregal", "schlagsahne": "Kühlregal", "saure sahne": "Kühlregal", "schmand": "Kühlregal", 
-      "crème fraîche": "Kühlregal", "creme fraiche": "Kühlregal", "feta": "Kühlregal",
+      "crème fraîche": "Kühlregal", "feta": "Kühlregal",
 
       // Getränke
-      "wasser": "Getränke", "mineralwasser": "Getränke", "sprudel": "Getränke", "bier": "Getränke", 
-      "cola": "Getränke", "saft": "Getränke", "apfelsaft": "Getränke", "orangensaft": "Getränke", "wein": "Getränke", 
-      "rotwein": "Getränke", "weißwein": "Getränke", "kaffee": "Getränke", "tee": "Getränke",
+      "wasser": "Getränke", "mineralwasser": "Getränke", "bier": "Getränke", "cola": "Getränke", 
+      "saft": "Getränke", "apfelsaft": "Getränke", "orangensaft": "Getränke", "wein": "Getränke", 
+      "kaffee": "Getränke", "tee": "Getränke",
 
-      // Drogerie & Haushalt
+      // Drogerie
       "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", 
-      "shampoo": "Drogerie", "duschgel": "Drogerie", "zahnpasta": "Drogerie", "zahnbürste": "Drogerie", 
-      "spülmittel": "Drogerie", "waschmittel": "Drogerie", "müllbeutel": "Drogerie", "alufolie": "Drogerie", "backpapier": "Drogerie"
+      "shampoo": "Drogerie", "duschgel": "Drogerie", "zahnpasta": "Drogerie", "spülmittel": "Drogerie", 
+      "waschmittel": "Drogerie", "müllbeutel": "Drogerie", "alufolie": "Drogerie", "backpapier": "Drogerie"
     };
 
     let storeRoutes = JSON.parse(JSON.stringify(defaultRoutes));
@@ -202,21 +212,17 @@
     let items = [];
     let editingItemId = null;
 
-    // Lokale Daten & Konfigurationen laden
     function initData() {
-      // Benutzerdefinierte Wörterbuch-Erweiterungen laden
       const savedDict = localStorage.getItem('local_category_dict');
       if (savedDict) {
         try { Object.assign(categoryDict, JSON.parse(savedDict)); } catch(e) {}
       }
 
-      // Benutzerdefinierte Routen laden
       const savedRoutes = localStorage.getItem('local_store_routes');
       if (savedRoutes) {
         try { storeRoutes = JSON.parse(savedRoutes); } catch(e) {}
       }
 
-      // URL-Import prüfen (Teilen)
       const urlParams = new URLSearchParams(window.location.search);
       const sharedData = urlParams.get('data');
 
@@ -255,7 +261,7 @@
       render();
     }
 
-    // Sprach- & Fließtext-Parser mit Reaktivierung bereits erledigter Artikel
+    // Sprach- & Textfilter mit automatischer Reaktivierung abgehakter Artikel
     function parseAndAdd(rawText) {
       let text = rawText.toLowerCase();
 
@@ -290,17 +296,14 @@
         const cat = categoryDict[word] || "Sonstiges";
         const title = word.charAt(0).toUpperCase() + word.slice(1);
 
-        // Prüfen, ob der Artikel bereits existiert
         const existingIndex = items.findIndex(i => i.title.toLowerCase() === title.toLowerCase());
 
         if (existingIndex > -1) {
-          // Reaktivieren, falls er bereits abgehakt war
           if (items[existingIndex].done) {
             items[existingIndex].done = false;
             items[existingIndex].completedAt = null;
           }
         } else {
-          // Neu eintragen
           items.push({
             id: 'id_' + Date.now() + Math.random().toString(36).substr(2, 4),
             title: title,
@@ -323,12 +326,10 @@
       }
     }
 
-    // Artikel abhaken oder reaktivieren
     function toggleItem(id) {
       const item = items.find(i => i.id === id);
       if (item) {
         item.done = !item.done;
-        // Zuletzt abgehakter Artikel erhält aktuellen Zeitstempel
         item.completedAt = item.done ? Date.now() : null;
         saveLocal();
         render();
@@ -341,7 +342,6 @@
       render();
     }
 
-    // Darstellung aufteilen: Aktiv (nach Markt) vs. Erledigt (chronologisch)
     function render() {
       const listContainer = document.getElementById('list-container');
       const doneListContainer = document.getElementById('done-list');
@@ -350,12 +350,11 @@
       doneListContainer.innerHTML = "";
 
       const activeItems = items.filter(i => !i.done);
-      // Erledigte Artikel: Neueste oben (nach Zeitstempel sortiert)
       const doneItems = items.filter(i => i.done).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
 
       doneCounter.textContent = `Erledigte Artikel (${doneItems.length})`;
 
-      // 1. Aktive Liste nach Supermarkt-Kategorien rendern
+      // 1. Aktive Artikel nach Supermarkt-Laufweg rendern
       if (activeItems.length === 0) {
         listContainer.innerHTML = "<div style='color: #888;'>Alle Artikel erledigt oder Liste ist leer.</div>";
       } else {
@@ -387,7 +386,7 @@
         });
       }
 
-      // 2. Erledigte Artikel chronologisch rendern
+      // 2. Erledigte Artikel chronologisch
       if (doneItems.length === 0) {
         doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Noch keine abgehakten Artikel.</div>";
       } else {
@@ -412,7 +411,6 @@
       }
     }
 
-    // Einklapp-Menü für erledigte Artikel steuern
     function toggleDoneSection() {
       const el = document.getElementById('done-list');
       const arrow = document.getElementById('done-arrow');
@@ -426,7 +424,7 @@
     }
 
     // ----------------------------------------------------
-    // KATEGORIE PRO ARTIKEL ÄNDERN & FÜR IMMER LERNEN
+    // KATEGORIE PRO ARTIKEL ÄNDERN & LERNEN
     // ----------------------------------------------------
     function openCategoryModal(itemId) {
       editingItemId = itemId;
@@ -459,7 +457,6 @@
       const item = items.find(i => i.id === editingItemId);
       if (item) {
         item.category = newCategory;
-        // Im Wörterbuch für die Zukunft abspeichern
         categoryDict[item.title.toLowerCase()] = newCategory;
         saveLocal();
         render();
@@ -468,10 +465,15 @@
     }
 
     // ----------------------------------------------------
-    // LAUFWEG PER DRAG & DROP ANPASSEN
+    // LAUFWEG & ZUSÄTZLICHE KATEGORIE
     // ----------------------------------------------------
     function openRouteModal() {
       document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
+      renderRouteList();
+      document.getElementById('route-modal').style.display = 'flex';
+    }
+
+    function renderRouteList() {
       const container = document.getElementById('drag-container');
       container.innerHTML = "";
 
@@ -491,8 +493,29 @@
 
         container.appendChild(li);
       });
+    }
 
-      document.getElementById('route-modal').style.display = 'flex';
+    // NEU: Neue Kategorie für den aktiven Markt anlegen
+    function addNewCategory() {
+      const input = document.getElementById('new-category-input');
+      const val = input.value.trim();
+      if (!val) return;
+
+      const formatted = val.charAt(0).toUpperCase() + val.slice(1);
+
+      if (!storeRoutes[activeStore].includes(formatted)) {
+        // Vor "Sonstiges" einfügen oder ans Ende
+        const sonstigesIdx = storeRoutes[activeStore].indexOf("Sonstiges");
+        if (sonstigesIdx > -1) {
+          storeRoutes[activeStore].splice(sonstigesIdx, 0, formatted);
+        } else {
+          storeRoutes[activeStore].push(formatted);
+        }
+        renderRouteList();
+        input.value = "";
+      } else {
+        alert("Diese Kategorie existiert bereits!");
+      }
     }
 
     let dragSrcEl = null;
