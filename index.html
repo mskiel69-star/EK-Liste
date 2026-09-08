@@ -23,7 +23,7 @@
     .store-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .store-header-row h2 { margin: 0; font-size: 0.95rem; color: #1a237e; }
     
-    /* Aufklappbares Dropdown-Menü */
+    /* Dropdown-Menü */
     .menu-container { position: relative; }
     .btn-menu-toggle {
       background: #eceff1;
@@ -74,7 +74,7 @@
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #e53935; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
-    /* Dynamische Supermarkt-Leiste (scrollbar bei vielen Märkten) */
+    /* Dynamische Supermarkt-Leiste */
     .store-bar-scroll {
       display: flex;
       gap: 8px;
@@ -165,7 +165,21 @@
     .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; gap: 8px; }
     .item-row:last-child { border-bottom: none; }
     .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
-    .item-name { flex: 1; font-size: 1.05rem; }
+    
+    .item-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .item-name { font-size: 1.05rem; }
+    .badge-store {
+      display: inline-block;
+      align-self: flex-start;
+      background: #e8eaf6;
+      color: #283593;
+      border: 1px solid #c5cae9;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
     .item-actions { display: flex; gap: 4px; }
     .btn-icon { background: #f0f0f0; border: 1px solid #cfd8dc; border-radius: 6px; padding: 4px 8px; font-size: 0.9rem; cursor: pointer; }
     .btn-delete { background: none; border: none; color: #b0bec5; font-size: 1.4rem; cursor: pointer; padding: 0 6px; line-height: 1; }
@@ -193,7 +207,6 @@
 </head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
-  <!-- Fixierte Menüleiste oben -->
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
@@ -222,7 +235,6 @@
       </div>
     </div>
 
-    <!-- Dynamische Supermarkt-Buttons -->
     <div class="store-bar-scroll" id="store-buttons-container"></div>
   </div>
 
@@ -246,7 +258,6 @@
     </div>
   </div>
 
-  <!-- Fixierte Eingabeleiste unten -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
@@ -258,11 +269,11 @@
     </div>
   </div>
 
-  <!-- Supermarkt-Manager Modal (Neu anlegen / Löschen) -->
+  <!-- Supermarkt-Manager Modal -->
   <div class="modal-overlay" id="store-manager-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Supermärkte verwalten</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Vorhandene Märkte (Klick zum Löschen, mindestens einer bleibt):</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Vorhandene Märkte:</p>
       <ul class="drag-list" id="store-list-container"></ul>
 
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
@@ -305,6 +316,16 @@
     </div>
   </div>
 
+  <!-- NEU: Markt-Zuweisung Modal ("Verfügbar bei...") -->
+  <div class="modal-overlay" id="item-store-modal">
+    <div class="modal">
+      <h2 style="margin-top: 0;">Supermarkt festlegen für: <span id="item-store-target-title" style="color: #00897b;"></span></h2>
+      <p style="font-size: 0.85rem; color: #546e7a;">Wähle, in welchem Supermarkt der Artikel gekauft werden soll:</p>
+      <div class="cat-btn-grid" id="item-store-choice-grid"></div>
+      <button class="btn-modal" style="background: #90a4ae;" onclick="closeItemStoreModal()">Abbrechen</button>
+    </div>
+  </div>
+
   <!-- Sync Modal -->
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
@@ -344,6 +365,7 @@
     let activeStore = "Aldi";
     let items = [];
     let editingItemId = null;
+    let editingStoreItemId = null;
 
     const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
@@ -363,7 +385,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v7/${syncCode}`;
+      const topic = `einkauf_live_v8/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -401,7 +423,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v7/${syncCode}`;
+        const topic = `einkauf_live_v8/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -441,7 +463,6 @@
       localStorage.setItem('local_category_dict', JSON.stringify(categoryDict));
     }
 
-    /* Dynamische Supermarkt-Schaltflächen oben */
     function renderStoreButtons() {
       const container = document.getElementById('store-buttons-container');
       container.innerHTML = "";
@@ -463,7 +484,6 @@
       render();
     }
 
-    /* Dropdown Menü Steuerung */
     function toggleDropdownMenu(e) {
       e.stopPropagation();
       document.getElementById('dropdown-menu').classList.toggle('show');
@@ -488,9 +508,7 @@
       }
     }
 
-    /* ----------------------------------------------------
-       SUPERMARKT-MANAGER: NEUE MÄRKTE ANLEGEN / LÖSCHEN
-       ---------------------------------------------------- */
+    /* Supermärkte verwalten */
     function openStoreManagerModal() {
       renderStoreManagerList();
       document.getElementById('store-manager-modal').style.display = 'flex';
@@ -528,7 +546,6 @@
         return;
       }
 
-      // Nimmt als Vorlage die Kategorien des aktuellen Marktes
       const baseCategories = storeRoutes[activeStore] || ["Gemüse", "Brot", "Kühlregal", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"];
       storeRoutes[formattedName] = [...baseCategories];
 
@@ -548,6 +565,9 @@
         if (activeStore === storeName) {
           activeStore = Object.keys(storeRoutes)[0];
         }
+        items.forEach(item => {
+          if (item.targetStore === storeName) item.targetStore = null;
+        });
         saveLocalOnly();
         renderStoreManagerList();
         renderStoreButtons();
@@ -557,7 +577,7 @@
     }
 
     /* ----------------------------------------------------
-       SPRACH- & TEXTPARSER: FLIESSTEXT & MARKT-ERKENNUNG
+       SPRACH- & TEXTFILTER (MIT BEI/NUR/FÜR MARKT-ERKENNUNG)
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
@@ -568,15 +588,16 @@
         return;
       }
 
-      // Erkennt dynamisch alle vorhandenen Märkte in der Sprache
+      // Prüfen, ob der gesamte aktive Markt umgeschaltet werden soll
       Object.keys(storeRoutes).forEach(storeName => {
-        if (text.includes(storeName.toLowerCase())) {
+        const sLower = storeName.toLowerCase();
+        if (text === sLower || text === `zu ${sLower}` || text === `bei ${sLower}`) {
           activeStore = storeName;
           renderStoreButtons();
         }
       });
 
-      // Fließtext-Füllwörter säubern
+      // Füllphrasen säubern
       const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
         "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
@@ -584,32 +605,53 @@
         "schreib auf", "setz auf die liste", "auf die liste"
       ];
       phrases.forEach(p => { text = text.replaceAll(p, " "); });
-      text = text.replace(/[,;.:!?]/g, ' ');
 
-      const words = text.split(/\s+/);
-      const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
-      const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", ...marketWords];
+      // Satzteile trennen
+      const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|[,;]+/);
 
-      words.forEach(w => {
-        const clean = w.trim();
-        if (!clean || stopWords.includes(clean)) return;
+      segments.forEach(seg => {
+        let segmentText = seg.trim();
+        if (!segmentText) return;
 
-        const cat = categoryDict[clean] || "Sonstiges";
-        const title = clean.charAt(0).toUpperCase() + clean.slice(1);
+        let detectedStore = null;
 
-        const existingIdx = items.findIndex(i => i.title.toLowerCase() === clean);
-        if (existingIdx > -1) {
-          items[existingIdx].done = false;
-          items[existingIdx].completedAt = null;
-        } else {
-          items.push({
-            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
-            title: title,
-            category: cat,
-            done: false,
-            completedAt: null
-          });
-        }
+        // Prüfen, ob ein Markt an den Artikel geknüpft ist (z.B. "Roggenbrot bei Aldi")
+        Object.keys(storeRoutes).forEach(storeName => {
+          const sLower = storeName.toLowerCase();
+          const storeRegex = new RegExp(`\\b(bei|nur bei|nur im|im|für)\\s+${sLower}\\b|\\b${sLower}\\b`, 'i');
+          if (storeRegex.test(segmentText)) {
+            detectedStore = storeName;
+            segmentText = segmentText.replace(storeRegex, ' ');
+          }
+        });
+
+        segmentText = segmentText.replace(/[,;.:!?]/g, ' ');
+        const words = segmentText.split(/\s+/);
+        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im"];
+
+        words.forEach(w => {
+          const clean = w.trim();
+          if (!clean || stopWords.includes(clean)) return;
+
+          const cat = categoryDict[clean] || "Sonstiges";
+          const title = clean.charAt(0).toUpperCase() + clean.slice(1);
+
+          const existingIdx = items.findIndex(i => i.title.toLowerCase() === clean);
+          if (existingIdx > -1) {
+            items[existingIdx].done = false;
+            items[existingIdx].completedAt = null;
+            if (detectedStore) items[existingIdx].targetStore = detectedStore;
+          } else {
+            items.push({
+              id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
+              title: title,
+              category: cat,
+              done: false,
+              completedAt: null,
+              targetStore: detectedStore // Verknüpfter Supermarkt
+            });
+          }
+        });
       });
 
       broadcastState();
@@ -683,10 +725,11 @@
           const row = document.createElement('div');
           row.className = "done-item";
           let timeString = item.completedAt ? 'um ' + new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          const storeBadge = item.targetStore ? ` • verfügbar bei ${item.targetStore}` : '';
           row.innerHTML = `
             <input type="checkbox" checked onchange="toggleItem('${item.id}')">
             <span class="title">${item.title}</span>
-            <span class="done-time">${timeString} (${item.category})</span>
+            <span class="done-time">${timeString} (${item.category}${storeBadge})</span>
             <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
           `;
           doneListContainer.appendChild(row);
@@ -702,10 +745,17 @@
       itemList.forEach(item => {
         const row = document.createElement('div');
         row.className = "item-row";
+        
+        const storeBadgeHtml = item.targetStore ? `<span class="badge-store">verfügbar bei ${item.targetStore}</span>` : '';
+
         row.innerHTML = `
           <input type="checkbox" onchange="toggleItem('${item.id}')">
-          <span class="item-name">${item.title}</span>
+          <div class="item-info">
+            <span class="item-name">${item.title}</span>
+            ${storeBadgeHtml}
+          </div>
           <div class="item-actions">
+            <button class="btn-icon" title="Supermarkt festlegen" onclick="openItemStoreModal('${item.id}')">🏬</button>
             <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
             <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
           </div>
@@ -727,6 +777,56 @@
       }
     }
 
+    /* ----------------------------------------------------
+       SUPERMARKT-ZUWEISUNG PRO ARTIKEL ("verfügbar bei...")
+       ---------------------------------------------------- */
+    function openItemStoreModal(itemId) {
+      editingStoreItemId = itemId;
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('item-store-target-title').textContent = item.title;
+      const grid = document.getElementById('item-store-choice-grid');
+      grid.innerHTML = "";
+
+      // Option: Überall / kein Markt festgelegt
+      const btnAll = document.createElement('button');
+      btnAll.className = "btn-cat-choice";
+      btnAll.style.background = "#f5f5f5";
+      btnAll.style.color = "#37474f";
+      btnAll.textContent = "🏢 Überall verfügbar";
+      btnAll.onclick = () => assignItemStore(null);
+      grid.appendChild(btnAll);
+
+      // Alle vorhandenen Supermärkte
+      Object.keys(storeRoutes).forEach(storeName => {
+        const btn = document.createElement('button');
+        btn.className = "btn-cat-choice";
+        btn.textContent = `🏬 Nur bei ${storeName}`;
+        btn.onclick = () => assignItemStore(storeName);
+        grid.appendChild(btn);
+      });
+
+      document.getElementById('item-store-modal').style.display = 'flex';
+    }
+
+    function closeItemStoreModal() {
+      document.getElementById('item-store-modal').style.display = 'none';
+      editingStoreItemId = null;
+    }
+
+    function assignItemStore(storeName) {
+      if (!editingStoreItemId) return;
+      const item = items.find(i => i.id === editingStoreItemId);
+      if (item) {
+        item.targetStore = storeName;
+        broadcastState();
+        render();
+      }
+      closeItemStoreModal();
+    }
+
+    /* Kategorie Modal */
     function openCategoryModal(itemId) {
       editingItemId = itemId;
       const item = items.find(i => i.id === itemId);
@@ -764,11 +864,9 @@
       closeCategoryModal();
     }
 
-    /* ----------------------------------------------------
-       LAUFWEG: REIHENFOLGE, UMBENENNEN & KATEGORIE LÖSCHEN
-       ---------------------------------------------------- */
+    /* Laufweg Modal */
     function openRouteModal() {
-      document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
+      document.getElementById('route-store-title').textContent = activeStore;
       renderRouteList();
       document.getElementById('route-modal').style.display = 'flex';
     }
@@ -925,9 +1023,7 @@
       });
     }
 
-    /* ----------------------------------------------------
-       SPRACHERKENNUNG
-       ---------------------------------------------------- */
+    /* Spracherkennung */
     let recognition = null;
     let keepRecording = false;
 
@@ -949,7 +1045,7 @@
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹️ Stopp";
-      status.textContent = "Höre zu... Sprich frei!";
+      status.textContent = "Höre zu... (z. B. 'Roggenbrot bei Famila und Eier bei Aldi')";
 
       try {
         recognition = new SpeechRec();
