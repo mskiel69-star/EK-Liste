@@ -6,55 +6,76 @@
   <title>Smarte Einkaufsliste</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 0 0 40px 0; background: #eceff1; color: #263238; }
+    body { margin: 0; padding: 0 0 100px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierter Gesamt-Header (Laufweg + kompakte Eingabe immer im Blick) */
-    .sticky-panel {
+    /* Kopfleiste: Oben fixiert für Markt-Auswahl */
+    .top-bar {
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 90;
       background: white;
       padding: 10px 14px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
       border-bottom: 1px solid #cfd8dc;
     }
-
     .store-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .store-header-row h2 { margin: 0; font-size: 0.95rem; color: #1a237e; }
     .btn-settings { background: #eceff1; border: 1px solid #b0bec5; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-
-    .store-bar { display: flex; gap: 8px; margin-bottom: 8px; }
-    .btn-store { flex: 1; padding: 7px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: 0.15s; }
+    
+    .store-bar { display: flex; gap: 8px; }
+    .btn-store { flex: 1; padding: 8px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Kompakte, schlanke Eingabezeile */
-    .compact-input-row { display: flex; gap: 6px; align-items: center; }
-    .compact-input-row input[type="text"] {
+    /* Eingabeleiste: Unten dauerhaft fixiert (über dem Daumen, kein Scrollen nach oben nötig) */
+    .bottom-input-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: #ffffff;
+      box-shadow: 0 -3px 12px rgba(0,0,0,0.15);
+      border-top: 1px solid #b0bec5;
+      padding: 8px 12px 10px 12px;
+    }
+    .input-inner-wrap { max-width: 600px; margin: 0 auto; }
+    .compact-row { display: flex; gap: 6px; align-items: center; }
+    .compact-row input[type="text"] {
       flex: 1;
-      padding: 8px 10px;
+      padding: 9px 12px;
       font-size: 0.95rem;
-      border: 1px solid #cfd8dc;
-      border-radius: 6px;
+      border: 1px solid #90a4ae;
+      border-radius: 8px;
       outline: none;
+      background: #f8fafc;
+    }
+    .compact-row input[type="text"]:focus {
+      border-color: #3f51b5;
+      background: #fff;
     }
     .btn-add-compact {
-      padding: 8px 14px;
+      width: 42px;
+      height: 38px;
       background: #00897b;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
-      font-size: 1.1rem;
+      font-size: 1.3rem;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .btn-mic-compact {
-      padding: 8px 12px;
+      height: 38px;
+      padding: 0 12px;
       background: #e53935;
       color: white;
       border: none;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
       font-weight: bold;
       cursor: pointer;
       display: flex;
@@ -62,13 +83,13 @@
       gap: 4px;
       white-space: nowrap;
     }
-    .btn-mic-compact.recording { background: #b71c1c; box-shadow: 0 0 10px rgba(229, 57, 53, 0.7); }
-    .status-compact { font-size: 0.75rem; color: #546e7a; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-mic-compact.recording { background: #b71c1c; box-shadow: 0 0 10px rgba(229, 57, 53, 0.8); }
+    .status-text { font-size: 0.72rem; color: #546e7a; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin-bottom: 14px; }
-    h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #1a237e; }
+    /* Listen-Karten */
+    .card { background: white; padding: 14px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin-top: 10px; margin-bottom: 14px; }
+    h2 { margin: 0 0 10px 0; font-size: 1.05rem; color: #1a237e; }
 
-    /* Einkaufslisten-Gruppen */
     .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
     .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
     .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; gap: 8px; }
@@ -81,31 +102,29 @@
     .btn-delete:hover { color: #e53935; }
 
     /* Erledigte Artikel */
-    .done-wrapper { margin-top: 20px; border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; }
+    .done-wrapper { border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; margin-top: 12px; margin-bottom: 20px; }
     .done-header { background: #e0e0e0; padding: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; }
     .done-item:last-child { border-bottom: none; }
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Modals */
+    /* Modalfenster */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
     .drag-item { background: #f5f5f5; border: 1px solid #cfd8dc; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
     .drag-item.dragging { opacity: 0.5; background: #e0e0e0; }
     .btn-modal { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 1rem; }
-
     .cat-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
     .btn-cat-choice { padding: 12px 8px; border: 1px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
-
     .btn-share { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <!-- Fixiertes Haupt-Panel: Laufweg & kompakte Eingabe bleiben immer oben -->
-  <div class="sticky-panel">
+  <!-- Oben fixiert: Supermarkt-Laufweg -->
+  <div class="top-bar">
     <div class="store-header-row">
       <h2>Supermarkt-Laufweg</h2>
       <button class="btn-settings" onclick="openRouteModal()">⚙️ Laufweg</button>
@@ -114,20 +133,12 @@
       <button class="btn-store active" id="btn-aldi" onclick="switchStore('aldi')">Aldi</button>
       <button class="btn-store" id="btn-famila" onclick="switchStore('famila')">Famila</button>
     </div>
-
-    <!-- Kompakte Eingabezeile -->
-    <div class="compact-input-row">
-      <input type="text" id="manual-input" placeholder="Artikel tippen..." onkeydown="if(event.key==='Enter') addFromInput()">
-      <button class="btn-add-compact" onclick="addFromInput()">+</button>
-      <button class="btn-mic-compact" id="btn-mic" onclick="toggleVoice()">🎙️ Sprache</button>
-    </div>
-    <div class="status-compact" id="mic-status">Bereit (Daueraufnahme möglich).</div>
   </div>
 
   <div class="container">
 
-    <!-- Aktive Liste nach Kategorien -->
-    <div class="card" style="margin-top: 10px;">
+    <!-- Aktive Artikel -->
+    <div class="card">
       <h2>Einkaufsliste</h2>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
@@ -141,14 +152,27 @@
       <div id="done-list" style="display: none;"></div>
     </div>
 
-    <div class="card" style="margin-top: 14px;">
+    <!-- Liste teilen -->
+    <div class="card">
       <button class="btn-share" onclick="shareList()">🔗 Liste teilen (Link kopieren)</button>
-      <div class="status-compact" id="share-status" style="text-align: center; margin-top: 6px;"></div>
+      <div class="status-text" id="share-status" style="text-align: center; margin-top: 6px;"></div>
     </div>
 
   </div>
 
-  <!-- Modal: Laufweg, Neue Kategorie & Kategorie löschen -->
+  <!-- Unten dauerhaft fixiert: Kompakte Eingabeleiste -->
+  <div class="bottom-input-bar">
+    <div class="input-inner-wrap">
+      <div class="compact-row">
+        <input type="text" id="manual-input" placeholder="Artikel tippen..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <button class="btn-add-compact" onclick="addFromInput()">+</button>
+        <button class="btn-mic-compact" id="btn-mic" onclick="toggleVoice()">🎙️ Sprache</button>
+      </div>
+      <div class="status-text" id="mic-status">Bereit (Daueraufnahme aktivierbar).</div>
+    </div>
+  </div>
+
+  <!-- Modal: Laufweg anpassen & Kategorien verwalten -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
@@ -159,7 +183,7 @@
         <label style="font-size: 0.85rem; font-weight: bold; color: #37474f;">Neue Kategorie hinzufügen (gilt für Aldi & Famila):</label>
         <div style="display: flex; gap: 6px; margin-top: 6px;">
           <input type="text" id="new-category-input" style="flex:1; padding:8px; border:1px solid #cfd8dc; border-radius:6px;" placeholder="z. B. Tiefkühlkost..." onkeydown="if(event.key==='Enter') addNewCategory()">
-          <button class="btn-add-compact" style="font-size: 0.9rem;" onclick="addNewCategory()">Hinzufügen</button>
+          <button class="btn-add-compact" style="width: auto; padding: 0 12px; font-size: 0.9rem;" onclick="addNewCategory()">Hinzufügen</button>
         </div>
       </div>
 
@@ -510,12 +534,12 @@
     }
 
     function deleteCategory(catName) {
-      if(catName === "Sonstiges") {
+      if (catName === "Sonstiges") {
         alert("Die Kategorie 'Sonstiges' dient als Auffangbecken und kann nicht gelöscht werden.");
         return;
       }
 
-      if(confirm(`Möchtest du die Kategorie "${catName}" wirklich für alle Märkte löschen?\nAlle darin befindlichen Artikel werden automatisch nach "Sonstiges" verschoben.`)) {
+      if (confirm(`Möchtest du die Kategorie "${catName}" wirklich für alle Märkte löschen?\nAlle darin befindlichen Artikel werden automatisch nach "Sonstiges" verschoben.`)) {
         ["aldi", "famila"].forEach(store => {
           storeRoutes[store] = storeRoutes[store].filter(c => c !== catName);
         });
@@ -594,7 +618,7 @@
     }
 
     function handleDragEnd() {
-      if(this.classList) this.classList.remove('dragging');
+      if (this.classList) this.classList.remove('dragging');
     }
 
     function saveCustomRoute() {
