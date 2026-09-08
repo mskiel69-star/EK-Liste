@@ -10,7 +10,7 @@
     body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Leiste oben */
+    /* Fixierte Kopfleiste */
     .top-bar {
       position: sticky;
       top: 0;
@@ -32,7 +32,7 @@
     .btn-store { flex: 1; padding: 8px; border: 2px solid #3f51b5; background: white; color: #3f51b5; font-weight: bold; border-radius: 6px; font-size: 0.95rem; cursor: pointer; transition: 0.15s; }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Fixierte Eingabe unten */
+    /* Fixierte Eingabeleiste unten */
     .bottom-input-bar {
       position: fixed;
       bottom: 0;
@@ -118,7 +118,7 @@
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
-    .drag-item { background: #f5f5f5; border: 1px solid #cfd8dc; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
+    .drag-item { background: #f5f5f5; border: 1px solid #cfd8dc; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
     .drag-item.dragging { opacity: 0.5; background: #e0e0e0; }
     .btn-modal { width: 100%; padding: 12px; background: #3f51b5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 1rem; }
     .cat-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
@@ -168,7 +168,7 @@
     </div>
   </div>
 
-  <!-- Dauerhaft unten fixierte Eingabeleiste -->
+  <!-- Fixierte Eingabeleiste unten -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
@@ -193,11 +193,11 @@
     </div>
   </div>
 
-  <!-- Laufweg Modal -->
+  <!-- Laufweg Modal inkl. Umbenennen-Funktion -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;">ALDI</span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge per Drag & Drop verschieben oder Kategorie löschen:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Reihenfolge verschieben (☰), Namen bearbeiten (✏️) oder löschen (🗑️):</p>
       <ul class="drag-list" id="drag-container"></ul>
 
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
@@ -212,7 +212,7 @@
     </div>
   </div>
 
-  <!-- Kategorie Modal -->
+  <!-- Kategorie Zuweisungs-Modal -->
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
@@ -267,7 +267,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v4/${syncCode}`;
+      const topic = `einkauf_live_v5/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -305,7 +305,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v4/${syncCode}`;
+        const topic = `einkauf_live_v5/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -356,9 +356,8 @@
       render();
     }
 
-    // Reset-Funktion für hängengebliebene Speicher-Reste
     function resetAllData() {
-      if (confirm("Möchtest du den Zwischenspeicher komplett leeren? Alle alten Reste werden gelöscht und die Liste frisch gestartet.")) {
+      if (confirm("Möchtest du den Speicher komplett zurücksetzen? Alle alten Reste werden bereinigt.")) {
         items = [];
         localStorage.removeItem('local_einkaufsliste');
         broadcastState();
@@ -367,7 +366,7 @@
       }
     }
 
-    // Präziser, fehlerfreier Filter: Bananen & alle Artikel kommen GARANTIERT durch!
+    // Sprach- und Textfilter
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
       let text = rawText.toLowerCase().trim();
@@ -380,7 +379,6 @@
       if (text.includes("aldi")) switchStoreUI("aldi");
       if (text.includes("famila")) switchStoreUI("famila");
 
-      // Satzbausteine entfernen
       const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
         "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
@@ -388,11 +386,8 @@
         "schreib auf", "setz auf die liste", "auf die liste"
       ];
       phrases.forEach(p => { text = text.replaceAll(p, " "); });
-
-      // Satzzeichen durch Leerzeichen ersetzen
       text = text.replace(/[,;.:!?]/g, ' ');
 
-      // Wörter aufteilen
       const words = text.split(/\s+/);
       const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "aldi", "famila", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit"];
 
@@ -400,18 +395,14 @@
         const clean = w.trim();
         if (!clean || stopWords.includes(clean)) return;
 
-        const cat = categoryDict[clean] || "Gemüse"; // Wenn Banane, dann direkt Gemüse
+        const cat = categoryDict[clean] || "Gemüse";
         const title = clean.charAt(0).toUpperCase() + clean.slice(1);
 
-        // Prüfen, ob der Artikel bereits in der Liste existiert
         const existingIdx = items.findIndex(i => i.title.toLowerCase() === clean);
-
         if (existingIdx > -1) {
-          // Falls vorhanden, einfach wieder auf aktiv setzen
           items[existingIdx].done = false;
           items[existingIdx].completedAt = null;
         } else {
-          // Ansonsten immer neu hinzufügen
           items.push({
             id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
             title: title,
@@ -479,7 +470,6 @@
           listContainer.appendChild(block);
         });
 
-        // Alle Artikel anzeigen, selbst wenn eine Kategorie nicht existiert
         const leftover = activeItems.filter(i => !renderedCategorySet.has(i.category));
         if (leftover.length > 0) {
           const block = createCategoryBlock("Sonstiges", leftover);
@@ -574,6 +564,9 @@
       closeCategoryModal();
     }
 
+    // ----------------------------------------------------
+    // LAUFWEG-MANAGER: SORTIEREN, UMBENENNEN & LÖSCHEN
+    // ----------------------------------------------------
     function openRouteModal() {
       document.getElementById('route-store-title').textContent = activeStore.toUpperCase();
       renderRouteList();
@@ -590,16 +583,22 @@
         li.draggable = true;
         li.dataset.index = index;
 
-        const canDelete = cat !== 'Sonstiges';
+        const canModify = cat !== 'Sonstiges';
+
         li.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="cursor:grab;">☰ ${cat}</span>
+          <div style="display:flex; align-items:center; gap:8px; flex:1;">
+            <span style="cursor:grab; font-weight:bold; color:#78909c;">☰</span>
+            <span class="cat-label-text" style="font-size:0.95rem;">${cat}</span>
           </div>
-          <div style="display:flex; align-items:center; gap:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
             <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>
-            ${canDelete ? `<button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0; color:#e53935;">🗑️</button>` : `<span style="width:20px;"></span>`}
+            ${canModify ? `
+              <button onclick="renameCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1rem; padding:0 2px;" title="Kategorie umbenennen">✏️</button>
+              <button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0 2px; color:#e53935;" title="Kategorie löschen">🗑️</button>
+            ` : `<span style="width:40px;"></span>`}
           </div>
         `;
+
         li.addEventListener('dragstart', handleDragStart);
         li.addEventListener('dragover', handleDragOver);
         li.addEventListener('drop', handleDrop);
@@ -608,9 +607,45 @@
       });
     }
 
+    // NEU: Kategorie umbenennen und überall aktualisieren
+    function renameCategory(oldName) {
+      if (oldName === "Sonstiges") return;
+
+      const newName = prompt(`Neuer Name für die Kategorie "${oldName}":`, oldName);
+      if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+      const formattedName = newName.trim().charAt(0).toUpperCase() + newName.trim().slice(1);
+
+      // In beiden Supermärkten (Aldi & Famila) umbenennen
+      ["aldi", "famila"].forEach(store => {
+        const idx = storeRoutes[store].indexOf(oldName);
+        if (idx > -1) {
+          storeRoutes[store][idx] = formattedName;
+        }
+      });
+
+      // Alle Artikel aktualisieren, die dieser Kategorie zugeordnet waren
+      items.forEach(item => {
+        if (item.category === oldName) {
+          item.category = formattedName;
+        }
+      });
+
+      // Im Zuordnungs-Wörterbuch anpassen
+      Object.keys(categoryDict).forEach(key => {
+        if (categoryDict[key] === oldName) {
+          categoryDict[key] = formattedName;
+        }
+      });
+
+      broadcastState();
+      renderRouteList();
+      render();
+    }
+
     function deleteCategory(catName) {
       if (catName === "Sonstiges") return;
-      if (confirm(`Kategorie "${catName}" für alle Märkte löschen? Artikel landen in "Sonstiges".`)) {
+      if (confirm(`Kategorie "${catName}" für alle Märkte löschen? Alle zugehörigen Artikel landen in "Sonstiges".`)) {
         ["aldi", "famila"].forEach(store => {
           storeRoutes[store] = storeRoutes[store].filter(c => c !== catName);
         });
@@ -670,7 +705,7 @@
     function saveCustomRoute() {
       const container = document.getElementById('drag-container');
       const itemsList = Array.from(container.querySelectorAll('.drag-item'));
-      storeRoutes[activeStore] = itemsList.map(li => li.querySelector('span').textContent.replace('☰ ', '').trim());
+      storeRoutes[activeStore] = itemsList.map(li => li.querySelector('.cat-label-text').textContent.trim());
       broadcastState();
       render();
       document.getElementById('route-modal').style.display = 'none';
