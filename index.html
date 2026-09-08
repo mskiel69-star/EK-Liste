@@ -74,7 +74,7 @@
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #e53935; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
-    /* Dynamische Supermarkt-Leiste */
+    /* Supermarkt-Auswahlleiste */
     .store-bar-scroll {
       display: flex;
       gap: 8px;
@@ -166,8 +166,22 @@
     .item-row:last-child { border-bottom: none; }
     .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
     
-    .item-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-    .item-name { font-size: 1.05rem; }
+    .item-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .item-title-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .item-name { font-size: 1.05rem; font-weight: 500; }
+    
+    /* Notiz/Preis Tag */
+    .item-extra-note {
+      display: inline-block;
+      background: #fff8e1;
+      color: #f57f17;
+      border: 1px solid #ffe082;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 4px;
+    }
+
     .badge-store {
       display: inline-block;
       align-self: flex-start;
@@ -261,7 +275,7 @@
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel tippen..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel tippen (z. B. Bananen 1.99€ bei Aldi)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-compact" id="btn-mic" onclick="toggleVoice()">🎙️ Sprache</button>
       </div>
@@ -316,13 +330,27 @@
     </div>
   </div>
 
-  <!-- NEU: Markt-Zuweisung Modal ("Verfügbar bei...") -->
+  <!-- Markt-Zuweisung Modal -->
   <div class="modal-overlay" id="item-store-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Supermarkt festlegen für: <span id="item-store-target-title" style="color: #00897b;"></span></h2>
       <p style="font-size: 0.85rem; color: #546e7a;">Wähle, in welchem Supermarkt der Artikel gekauft werden soll:</p>
       <div class="cat-btn-grid" id="item-store-choice-grid"></div>
       <button class="btn-modal" style="background: #90a4ae;" onclick="closeItemStoreModal()">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- Notiz / Preis Modal -->
+  <div class="modal-overlay" id="note-modal">
+    <div class="modal">
+      <h2 style="margin-top: 0;">Hinweis / Preis für <span id="note-modal-title" style="color: #00897b;"></span></h2>
+      <p style="font-size: 0.85rem; color: #546e7a;">Trage einen Preis, Menge oder Hinweis ein (z. B. 1,99 €, 500g, Bio):</p>
+      <input type="text" id="note-modal-input" style="width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cfd8dc; border-radius: 8px; margin-bottom: 12px;" placeholder="z. B. 2,49 € oder 2 Packungen" onkeydown="if(event.key==='Enter') saveItemNote()">
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-modal" style="margin-top: 0;" onclick="saveItemNote()">Speichern</button>
+        <button class="btn-modal" style="background: #ffebee; color: #c62828; margin-top: 0;" onclick="clearItemNote()">Löschen</button>
+      </div>
+      <button class="btn-modal" style="background: #90a4ae; margin-top: 8px;" onclick="closeNoteModal()">Abbrechen</button>
     </div>
   </div>
 
@@ -340,6 +368,7 @@
   </div>
 
   <script>
+    // Standard-Laufwege: Aldi startet mit Gemüse, Famila mit Brot
     const defaultRoutes = {
       "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
       "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
@@ -366,6 +395,7 @@
     let items = [];
     let editingItemId = null;
     let editingStoreItemId = null;
+    let editingNoteItemId = null;
 
     const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
@@ -385,7 +415,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v8/${syncCode}`;
+      const topic = `einkauf_live_v9/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -423,7 +453,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v8/${syncCode}`;
+        const topic = `einkauf_live_v9/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -577,7 +607,7 @@
     }
 
     /* ----------------------------------------------------
-       SPRACH- & TEXTFILTER (MIT BEI/NUR/FÜR MARKT-ERKENNUNG)
+       SPRACH- & TEXTFILTER: FLIESSTEXT, PREISE & MÄRKTE
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
@@ -588,7 +618,7 @@
         return;
       }
 
-      // Prüfen, ob der gesamte aktive Markt umgeschaltet werden soll
+      // Prüfen, ob der Hauptmarkt gewechselt werden soll
       Object.keys(storeRoutes).forEach(storeName => {
         const sLower = storeName.toLowerCase();
         if (text === sLower || text === `zu ${sLower}` || text === `bei ${sLower}`) {
@@ -597,7 +627,7 @@
         }
       });
 
-      // Füllphrasen säubern
+      // Fließtext-Füllphrasen herausfiltern
       const phrases = [
         "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
         "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
@@ -606,7 +636,6 @@
       ];
       phrases.forEach(p => { text = text.replaceAll(p, " "); });
 
-      // Satzteile trennen
       const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|[,;]+/);
 
       segments.forEach(seg => {
@@ -614,8 +643,9 @@
         if (!segmentText) return;
 
         let detectedStore = null;
+        let detectedNote = null;
 
-        // Prüfen, ob ein Markt an den Artikel geknüpft ist (z.B. "Roggenbrot bei Aldi")
+        // 1. Supermarkt im Satzteil filtern
         Object.keys(storeRoutes).forEach(storeName => {
           const sLower = storeName.toLowerCase();
           const storeRegex = new RegExp(`\\b(bei|nur bei|nur im|im|für)\\s+${sLower}\\b|\\b${sLower}\\b`, 'i');
@@ -625,9 +655,18 @@
           }
         });
 
+        // 2. Preis- / Notiz-Muster filtern (z. B. "für 1.99 euro", "1,99€", "2 packungen")
+        const priceRegex = /\b(für\s+)?(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g))\b/i;
+        const priceMatch = segmentText.match(priceRegex);
+        if (priceMatch) {
+          detectedNote = priceMatch[0].replace(/^für\s+/i, '').trim();
+          segmentText = segmentText.replace(priceMatch[0], ' ');
+        }
+
         segmentText = segmentText.replace(/[,;.:!?]/g, ' ');
         const words = segmentText.split(/\s+/);
-        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im"];
+        const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
+        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", "euro", ...marketWords];
 
         words.forEach(w => {
           const clean = w.trim();
@@ -641,6 +680,7 @@
             items[existingIdx].done = false;
             items[existingIdx].completedAt = null;
             if (detectedStore) items[existingIdx].targetStore = detectedStore;
+            if (detectedNote) items[existingIdx].note = detectedNote;
           } else {
             items.push({
               id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
@@ -648,7 +688,8 @@
               category: cat,
               done: false,
               completedAt: null,
-              targetStore: detectedStore // Verknüpfter Supermarkt
+              targetStore: detectedStore,
+              note: detectedNote || null
             });
           }
         });
@@ -726,10 +767,11 @@
           row.className = "done-item";
           let timeString = item.completedAt ? 'um ' + new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
           const storeBadge = item.targetStore ? ` • verfügbar bei ${item.targetStore}` : '';
+          const noteBadge = item.note ? ` • [${item.note}]` : '';
           row.innerHTML = `
             <input type="checkbox" checked onchange="toggleItem('${item.id}')">
             <span class="title">${item.title}</span>
-            <span class="done-time">${timeString} (${item.category}${storeBadge})</span>
+            <span class="done-time">${timeString} (${item.category}${storeBadge}${noteBadge})</span>
             <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
           `;
           doneListContainer.appendChild(row);
@@ -747,14 +789,19 @@
         row.className = "item-row";
         
         const storeBadgeHtml = item.targetStore ? `<span class="badge-store">verfügbar bei ${item.targetStore}</span>` : '';
+        const noteBadgeHtml = item.note ? `<span class="item-extra-note">${item.note}</span>` : '';
 
         row.innerHTML = `
           <input type="checkbox" onchange="toggleItem('${item.id}')">
           <div class="item-info">
-            <span class="item-name">${item.title}</span>
+            <div class="item-title-line">
+              <span class="item-name">${item.title}</span>
+              ${noteBadgeHtml}
+            </div>
             ${storeBadgeHtml}
           </div>
           <div class="item-actions">
+            <button class="btn-icon" title="Hinweis / Preis bearbeiten" onclick="openNoteModal('${item.id}')">📝</button>
             <button class="btn-icon" title="Supermarkt festlegen" onclick="openItemStoreModal('${item.id}')">🏬</button>
             <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
             <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
@@ -778,8 +825,48 @@
     }
 
     /* ----------------------------------------------------
-       SUPERMARKT-ZUWEISUNG PRO ARTIKEL ("verfügbar bei...")
+       NOTIZ- / PREIS-MANAGER PRO ARTIKEL
        ---------------------------------------------------- */
+    function openNoteModal(itemId) {
+      editingNoteItemId = itemId;
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('note-modal-title').textContent = item.title;
+      document.getElementById('note-modal-input').value = item.note || "";
+      document.getElementById('note-modal').style.display = 'flex';
+      setTimeout(() => document.getElementById('note-modal-input').focus(), 50);
+    }
+
+    function closeNoteModal() {
+      document.getElementById('note-modal').style.display = 'none';
+      editingNoteItemId = null;
+    }
+
+    function saveItemNote() {
+      if (!editingNoteItemId) return;
+      const item = items.find(i => i.id === editingNoteItemId);
+      const val = document.getElementById('note-modal-input').value.trim();
+      if (item) {
+        item.note = val ? val : null;
+        broadcastState();
+        render();
+      }
+      closeNoteModal();
+    }
+
+    function clearItemNote() {
+      if (!editingNoteItemId) return;
+      const item = items.find(i => i.id === editingNoteItemId);
+      if (item) {
+        item.note = null;
+        broadcastState();
+        render();
+      }
+      closeNoteModal();
+    }
+
+    /* Supermarkt-Zuweisung Modal */
     function openItemStoreModal(itemId) {
       editingStoreItemId = itemId;
       const item = items.find(i => i.id === itemId);
@@ -789,7 +876,6 @@
       const grid = document.getElementById('item-store-choice-grid');
       grid.innerHTML = "";
 
-      // Option: Überall / kein Markt festgelegt
       const btnAll = document.createElement('button');
       btnAll.className = "btn-cat-choice";
       btnAll.style.background = "#f5f5f5";
@@ -798,7 +884,6 @@
       btnAll.onclick = () => assignItemStore(null);
       grid.appendChild(btnAll);
 
-      // Alle vorhandenen Supermärkte
       Object.keys(storeRoutes).forEach(storeName => {
         const btn = document.createElement('button');
         btn.className = "btn-cat-choice";
@@ -1045,7 +1130,7 @@
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹️ Stopp";
-      status.textContent = "Höre zu... (z. B. 'Roggenbrot bei Famila und Eier bei Aldi')";
+      status.textContent = "Höre zu... (z. B. 'Bananen 1,99 Euro bei Aldi')";
 
       try {
         recognition = new SpeechRec();
