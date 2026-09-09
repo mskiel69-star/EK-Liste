@@ -10,7 +10,7 @@
     body { margin: 0; padding: 0 0 100px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Kopfleiste oben */
+    /* Fixierte Menüleiste oben */
     .top-bar {
       position: sticky;
       top: 0;
@@ -139,7 +139,6 @@
       justify-content: center;
     }
     
-    /* Kleiner Mikrofon-Button */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -273,11 +272,10 @@
     </div>
   </div>
 
-  <!-- Fixierte Eingabeleiste unten mit kleinem Mikrofon-Button -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel tippen..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Äpfel 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
@@ -342,20 +340,6 @@
     </div>
   </div>
 
-  <!-- Notiz / Preis Modal -->
-  <div class="modal-overlay" id="note-modal">
-    <div class="modal">
-      <h2 style="margin-top: 0;">Hinweis / Preis für <span id="note-modal-title" style="color: #00897b;"></span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Trage einen Preis, Menge oder Hinweis ein (z. B. 1,99 €, 500g, Bio):</p>
-      <input type="text" id="note-modal-input" style="width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cfd8dc; border-radius: 8px; margin-bottom: 12px;" placeholder="z. B. 2,49 € oder 2 Packungen" onkeydown="if(event.key==='Enter') saveItemNote()">
-      <div style="display: flex; gap: 8px;">
-        <button class="btn-modal" style="margin-top: 0;" onclick="saveItemNote()">Speichern</button>
-        <button class="btn-modal" style="background: #ffebee; color: #c62828; margin-top: 0;" onclick="clearItemNote()">Löschen</button>
-      </div>
-      <button class="btn-modal" style="background: #90a4ae; margin-top: 8px;" onclick="closeNoteModal()">Abbrechen</button>
-    </div>
-  </div>
-
   <!-- Sync Modal -->
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
@@ -377,10 +361,10 @@
     };
 
     const initialDict = {
-      "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", "tomate": "Gemüse", "tomaten": "Gemüse",
-      "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "apfel": "Gemüse", "äpfel": "Gemüse", "birne": "Gemüse", "birnen": "Gemüse",
-      "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", "möhren": "Gemüse",
-      "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
+      "äpfel": "Gemüse", "apfel": "Gemüse", "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", 
+      "tomate": "Gemüse", "tomaten": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "birne": "Gemüse", 
+      "birnen": "Gemüse", "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", 
+      "möhren": "Gemüse", "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
       "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "spinat": "Gemüse", "lauch": "Gemüse", "porree": "Gemüse",
       "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
       "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
@@ -397,7 +381,6 @@
     let items = [];
     let editingItemId = null;
     let editingStoreItemId = null;
-    let editingNoteItemId = null;
 
     const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
@@ -417,7 +400,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v10/${syncCode}`;
+      const topic = `einkauf_live_v11/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -455,7 +438,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v10/${syncCode}`;
+        const topic = `einkauf_live_v11/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -609,35 +592,38 @@
     }
 
     /* ----------------------------------------------------
-       SPRACH- & TEXTPARSER: FLIESSTEXT, PREISE & MÄRKTE
+       SPRACH- & TEXTFILTER: LEERZEICHEN-ZUSATZ (z. B. "Äpfel 1,99")
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
-      let text = rawText.toLowerCase().trim();
+      let text = rawText.trim();
 
-      if (text.includes("aufnahme beenden") || text.includes("stop")) {
+      if (text.toLowerCase().includes("aufnahme beenden") || text.toLowerCase().includes("stop")) {
         stopVoice();
         return;
       }
 
-      // Prüfen, ob der Hauptmarkt gewechselt werden soll
+      // Reiner Marktwechsel bei Spracheingabe
       Object.keys(storeRoutes).forEach(storeName => {
         const sLower = storeName.toLowerCase();
-        if (text === sLower || text === `zu ${sLower}` || text === `bei ${sLower}`) {
-          activeStore = storeName;
-          renderStoreButtons();
+        if (text.toLowerCase() === sLower || text.toLowerCase() === `zu ${sLower}` || text.toLowerCase() === `bei ${sLower}`) {
+          switchStore(storeName);
         }
       });
 
       // Fließtext-Füllphrasen herausfiltern
       const phrases = [
-        "ich brauche", "wir brauchen", "brauche ich", "brauchen wir",
-        "ich brauche noch", "wir brauchen noch", "ich möchte", "wir möchten",
+        "ich brauche noch", "wir brauchen noch", "ich brauche", "wir brauchen", 
+        "brauche ich", "brauchen wir", "ich möchte", "wir möchten",
         "kauf bitte", "kaufe bitte", "bring bitte mit", "bring mit", "besorge bitte", 
         "schreib auf", "setz auf die liste", "auf die liste"
       ];
-      phrases.forEach(p => { text = text.replaceAll(p, " "); });
+      phrases.forEach(p => {
+        const reg = new RegExp(`\\b${p}\\b`, 'gi');
+        text = text.replace(reg, " ");
+      });
 
+      // Satzteile aufteilen (Komma, Semikolon, " und ", " sowie ")
       const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|[,;]+/);
 
       segments.forEach(seg => {
@@ -645,56 +631,57 @@
         if (!segmentText) return;
 
         let detectedStore = null;
-        let detectedNote = null;
 
-        // 1. Supermarkt im Satzteil filtern
+        // Supermarkt-Zuweisung ermitteln
         Object.keys(storeRoutes).forEach(storeName => {
           const sLower = storeName.toLowerCase();
           const storeRegex = new RegExp(`\\b(bei|nur bei|nur im|im|für)\\s+${sLower}\\b|\\b${sLower}\\b`, 'i');
           if (storeRegex.test(segmentText)) {
             detectedStore = storeName;
-            segmentText = segmentText.replace(storeRegex, ' ');
+            segmentText = segmentText.replace(storeRegex, ' ').trim();
           }
         });
 
-        // 2. Preis- / Notiz-Muster filtern
-        const priceRegex = /\b(für\s+)?(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g))\b/i;
-        const priceMatch = segmentText.match(priceRegex);
-        if (priceMatch) {
-          detectedNote = priceMatch[0].replace(/^für\s+/i, '').trim();
-          segmentText = segmentText.replace(priceMatch[0], ' ');
+        if (!segmentText) return;
+
+        // Artikel & Zusatzinfo trennen: Erstes Wort = Artikel, Rest nach dem Leerzeichen = Zusatz/Preis
+        const spaceIndex = segmentText.indexOf(' ');
+        let articleWord = "";
+        let extraNote = null;
+
+        if (spaceIndex > -1) {
+          articleWord = segmentText.substring(0, spaceIndex).trim();
+          extraNote = segmentText.substring(spaceIndex + 1).trim();
+        } else {
+          articleWord = segmentText.trim();
         }
 
-        segmentText = segmentText.replace(/[,;.:!?]/g, ' ');
-        const words = segmentText.split(/\s+/);
+        const cleanKey = articleWord.toLowerCase().replace(/[,;.:!?]/g, '');
         const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
-        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", "euro", ...marketWords];
+        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", ...marketWords];
 
-        words.forEach(w => {
-          const clean = w.trim();
-          if (!clean || stopWords.includes(clean)) return;
+        if (!cleanKey || stopWords.includes(cleanKey)) return;
 
-          const cat = categoryDict[clean] || "Sonstiges";
-          const title = clean.charAt(0).toUpperCase() + clean.slice(1);
+        const cat = categoryDict[cleanKey] || "Sonstiges";
+        const title = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1);
 
-          const existingIdx = items.findIndex(i => i.title.toLowerCase() === clean);
-          if (existingIdx > -1) {
-            items[existingIdx].done = false;
-            items[existingIdx].completedAt = null;
-            if (detectedStore) items[existingIdx].targetStore = detectedStore;
-            if (detectedNote) items[existingIdx].note = detectedNote;
-          } else {
-            items.push({
-              id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
-              title: title,
-              category: cat,
-              done: false,
-              completedAt: null,
-              targetStore: detectedStore,
-              note: detectedNote || null
-            });
-          }
-        });
+        const existingIdx = items.findIndex(i => i.title.toLowerCase() === cleanKey);
+        if (existingIdx > -1) {
+          items[existingIdx].done = false;
+          items[existingIdx].completedAt = null;
+          if (detectedStore) items[existingIdx].targetStore = detectedStore;
+          if (extraNote) items[existingIdx].note = extraNote;
+        } else {
+          items.push({
+            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
+            title: title,
+            category: cat,
+            done: false,
+            completedAt: null,
+            targetStore: detectedStore,
+            note: extraNote || null
+          });
+        }
       });
 
       broadcastState();
@@ -803,7 +790,6 @@
             ${storeBadgeHtml}
           </div>
           <div class="item-actions">
-            <button class="btn-icon" title="Hinweis / Preis bearbeiten" onclick="openNoteModal('${item.id}')">📝</button>
             <button class="btn-icon" title="Supermarkt festlegen" onclick="openItemStoreModal('${item.id}')">🏬</button>
             <button class="btn-icon" title="Kategorie ändern" onclick="openCategoryModal('${item.id}')">📁</button>
             <button class="btn-delete" title="Löschen" onclick="deleteItem('${item.id}')">×</button>
@@ -824,46 +810,6 @@
         el.style.display = 'none';
         arrow.textContent = '▼';
       }
-    }
-
-    /* Notiz / Preis Modal */
-    function openNoteModal(itemId) {
-      editingNoteItemId = itemId;
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-
-      document.getElementById('note-modal-title').textContent = item.title;
-      document.getElementById('note-modal-input').value = item.note || "";
-      document.getElementById('note-modal').style.display = 'flex';
-      setTimeout(() => document.getElementById('note-modal-input').focus(), 50);
-    }
-
-    function closeNoteModal() {
-      document.getElementById('note-modal').style.display = 'none';
-      editingNoteItemId = null;
-    }
-
-    function saveItemNote() {
-      if (!editingNoteItemId) return;
-      const item = items.find(i => i.id === editingNoteItemId);
-      const val = document.getElementById('note-modal-input').value.trim();
-      if (item) {
-        item.note = val ? val : null;
-        broadcastState();
-        render();
-      }
-      closeNoteModal();
-    }
-
-    function clearItemNote() {
-      if (!editingNoteItemId) return;
-      const item = items.find(i => i.id === editingNoteItemId);
-      if (item) {
-        item.note = null;
-        broadcastState();
-        render();
-      }
-      closeNoteModal();
     }
 
     /* Supermarkt-Zuweisung Modal */
@@ -1129,7 +1075,7 @@
 
       keepRecording = true;
       micBtn.classList.add('recording');
-      status.textContent = "Höre zu... (z. B. 'Bananen 1,99 Euro bei Aldi')";
+      status.textContent = "Höre zu... (z. B. 'Äpfel 1,99 bei Aldi und Brot 2 Stück')";
 
       try {
         recognition = new SpeechRec();
