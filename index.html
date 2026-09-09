@@ -10,7 +10,7 @@
     body { margin: 0; padding: 0 0 100px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Menüleiste oben */
+    /* Fixierte Kopfleiste oben */
     .top-bar {
       position: sticky;
       top: 0;
@@ -139,6 +139,7 @@
       justify-content: center;
     }
     
+    /* Sprachbutton: Mikrofon im Ruhezustand, rotes Viereck bei Aufnahme */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -154,7 +155,10 @@
       flex-shrink: 0;
       transition: 0.2s;
     }
-    .btn-mic-icon-only.recording { background: #b71c1c; box-shadow: 0 0 10px rgba(229, 57, 53, 0.8); }
+    .btn-mic-icon-only.recording {
+      background: #b71c1c;
+      box-shadow: 0 0 10px rgba(229, 57, 53, 0.8);
+    }
     .status-text { font-size: 0.72rem; color: #546e7a; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Listen-Karten */
@@ -275,7 +279,7 @@
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Äpfel 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Nudeln 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
@@ -354,13 +358,14 @@
   </div>
 
   <script>
-    // Feste Standard-Laufwege: Aldi startet mit Gemüse, Famila mit Brot
+    // Standard-Laufwege je Supermarkt
     const defaultRoutes = {
-      "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Getränke", "Drogerie", "Sonstiges"],
-      "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Getränke", "Drogerie", "Sonstiges"]
+      "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"],
+      "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"]
     };
 
     const initialDict = {
+      "nudeln": "Nudeln und Getreide", "spaghetti": "Nudeln und Getreide", "reis": "Nudeln und Getreide",
       "äpfel": "Gemüse", "apfel": "Gemüse", "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", 
       "tomate": "Gemüse", "tomaten": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "birne": "Gemüse", 
       "birnen": "Gemüse", "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", 
@@ -400,7 +405,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v11/${syncCode}`;
+      const topic = `einkauf_live_v12/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -438,7 +443,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v11/${syncCode}`;
+        const topic = `einkauf_live_v12/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -592,7 +597,7 @@
     }
 
     /* ----------------------------------------------------
-       SPRACH- & TEXTFILTER: LEERZEICHEN-ZUSATZ (z. B. "Äpfel 1,99")
+       ROBUSTER SPRACH- & TEXTPARSER MIT PREIS- UND SATZFILTERUNG
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
@@ -603,7 +608,7 @@
         return;
       }
 
-      // Reiner Marktwechsel bei Spracheingabe
+      // Reiner Supermarktwechsel bei Spracheingabe
       Object.keys(storeRoutes).forEach(storeName => {
         const sLower = storeName.toLowerCase();
         if (text.toLowerCase() === sLower || text.toLowerCase() === `zu ${sLower}` || text.toLowerCase() === `bei ${sLower}`) {
@@ -611,19 +616,17 @@
         }
       });
 
-      // Fließtext-Füllphrasen herausfiltern
-      const phrases = [
-        "ich brauche noch", "wir brauchen noch", "ich brauche", "wir brauchen", 
-        "brauche ich", "brauchen wir", "ich möchte", "wir möchten",
-        "kauf bitte", "kaufe bitte", "bring bitte mit", "bring mit", "besorge bitte", 
-        "schreib auf", "setz auf die liste", "auf die liste"
+      // 1. Befehls- und Füllsätze sauber entfernen
+      const fillerRegexes = [
+        /\b(packe|pack|schreib|schreibe|setze|setz|tu|packen)\s+(bitte\s+)?/gi,
+        /\b(in\s+die\s+einkaufsliste|auf\s+die\s+einkaufsliste|auf\s+die\s+liste|in\s+die\s+liste|zur\s+liste|dazu)\b/gi,
+        /\b(ich\s+brauche\s+noch|wir\s+brauchen\s+noch|ich\s+brauche|wir\s+brauchen)\b/gi,
+        /\b(brauche\s+ich|brauchen\s+wir|ich\s+möchte|wir\s+möchten)\b/gi,
+        /\b(kauf\s+bitte|kaufe\s+bitte|bring\s+bitte\s+mit|bring\s+mit|besorge\s+bitte)\b/gi
       ];
-      phrases.forEach(p => {
-        const reg = new RegExp(`\\b${p}\\b`, 'gi');
-        text = text.replace(reg, " ");
-      });
+      fillerRegexes.forEach(reg => { text = text.replace(reg, " "); });
 
-      // Satzteile aufteilen (Komma, Semikolon, " und ", " sowie ")
+      // 2. Teilsätze aufteilen (durch Komma, Semikolon, " und ", " sowie ")
       const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|[,;]+/);
 
       segments.forEach(seg => {
@@ -632,7 +635,7 @@
 
         let detectedStore = null;
 
-        // Supermarkt-Zuweisung ermitteln
+        // Supermarkt-Zuweisung pro Teilsatz prüfen (z. B. "bei Aldi")
         Object.keys(storeRoutes).forEach(storeName => {
           const sLower = storeName.toLowerCase();
           const storeRegex = new RegExp(`\\b(bei|nur bei|nur im|im|für)\\s+${sLower}\\b|\\b${sLower}\\b`, 'i');
@@ -644,21 +647,34 @@
 
         if (!segmentText) return;
 
-        // Artikel & Zusatzinfo trennen: Erstes Wort = Artikel, Rest nach dem Leerzeichen = Zusatz/Preis
-        const spaceIndex = segmentText.indexOf(' ');
-        let articleWord = "";
+        // 3. Explizite Preis- oder Mengenangaben extrahieren (z. B. "zu 1,99€", "für 1.99 euro", "1,99 €")
         let extraNote = null;
+        const priceRegex = /\b(zu|für)?\s*(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g|dose|dosen))\b/i;
+        const priceMatch = segmentText.match(priceRegex);
 
-        if (spaceIndex > -1) {
-          articleWord = segmentText.substring(0, spaceIndex).trim();
-          extraNote = segmentText.substring(spaceIndex + 1).trim();
+        if (priceMatch && priceMatch[0].trim().length > 0) {
+          extraNote = priceMatch[0].replace(/^(zu|für)\s+/i, '').trim();
+          segmentText = segmentText.replace(priceMatch[0], ' ').trim();
+        }
+
+        // Falls noch kein Preis-Muster griff, aber Leerzeichen vorhanden sind (z. B. "Äpfel 1,99")
+        let articleWord = "";
+        if (!extraNote) {
+          const spaceIndex = segmentText.indexOf(' ');
+          if (spaceIndex > -1) {
+            articleWord = segmentText.substring(0, spaceIndex).trim();
+            extraNote = segmentText.substring(spaceIndex + 1).trim();
+          } else {
+            articleWord = segmentText.trim();
+          }
         } else {
           articleWord = segmentText.trim();
         }
 
-        const cleanKey = articleWord.toLowerCase().replace(/[,;.:!?]/g, '');
+        // Wörter bereinigen
+        const cleanKey = articleWord.toLowerCase().replace(/[,;.:!?]/g, '').trim();
         const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
-        const stopWords = ["und", "sowie", "auch", "bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", ...marketWords];
+        const stopWords = ["bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", "zu", ...marketWords];
 
         if (!cleanKey || stopWords.includes(cleanKey)) return;
 
@@ -1054,7 +1070,9 @@
       });
     }
 
-    /* Spracherkennung */
+    /* ----------------------------------------------------
+       SPRACHERKENNUNG (MIT VIERECK-SYMBOL BEI AUFNAHME)
+       ---------------------------------------------------- */
     let recognition = null;
     let keepRecording = false;
 
@@ -1075,7 +1093,8 @@
 
       keepRecording = true;
       micBtn.classList.add('recording');
-      status.textContent = "Höre zu... (z. B. 'Äpfel 1,99 bei Aldi und Brot 2 Stück')";
+      micBtn.textContent = "⏹"; // Rotes Stopp-Viereck zeigt laufende Aufnahme
+      status.textContent = "Aufnahme läuft... (z. B. 'Packe Nudeln zu 1,99€ in die Einkaufsliste')";
 
       try {
         recognition = new SpeechRec();
@@ -1093,12 +1112,14 @@
             try { recognition.start(); } catch(e) {}
           } else {
             micBtn.classList.remove('recording');
+            micBtn.textContent = "🎙️";
           }
         };
 
         recognition.onerror = () => {
           if (!keepRecording) {
             micBtn.classList.remove('recording');
+            micBtn.textContent = "🎙️";
           }
         };
 
@@ -1113,6 +1134,7 @@
       const status = document.getElementById('mic-status');
       const micBtn = document.getElementById('btn-mic');
       micBtn.classList.remove('recording');
+      micBtn.textContent = "🎙️";
       status.textContent = "Bereit für Eingaben.";
       if (recognition) {
         try { recognition.stop(); } catch(e) {}
