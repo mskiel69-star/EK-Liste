@@ -25,7 +25,6 @@
     
     .header-actions { display: flex; align-items: center; gap: 6px; }
 
-    /* Kompakter Teilen-Button oben */
     .btn-share-icon {
       background: #eceff1;
       border: 1px solid #b0bec5;
@@ -155,7 +154,7 @@
       justify-content: center;
     }
     
-    /* Sprachbutton */
+    /* Sprachbutton: Mikrofon im Ruhezustand, Stopp-Viereck bei Aufnahme */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -191,6 +190,7 @@
     .item-title-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .item-name { font-size: 1.05rem; font-weight: 500; }
     
+    /* Notiz/Preis Tag */
     .item-extra-note {
       display: inline-block;
       background: #fff8e1;
@@ -248,7 +248,6 @@
       </div>
 
       <div class="header-actions">
-        <!-- Neuer kleiner Teilen-Button direkt oben neben den Optionen -->
         <button class="btn-share-icon" onclick="shareList()" title="Sync-Link kopieren">🔗</button>
 
         <div class="menu-container">
@@ -299,7 +298,7 @@
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Nudeln 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Äpfel 3,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
@@ -369,7 +368,7 @@
     <div class="modal">
       <h2 style="margin-top: 0;">Bemerkung / Preis für <span id="note-modal-title" style="color: #00897b;"></span></h2>
       <p style="font-size: 0.85rem; color: #546e7a;">Hier kannst du deine Bemerkung korrigieren, ergänzen oder löschen:</p>
-      <input type="text" id="note-modal-input" style="width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cfd8dc; border-radius: 8px; margin-bottom: 12px;" placeholder="z. B. 1,99 € oder 2 Packungen" onkeydown="if(event.key==='Enter') saveItemNote()">
+      <input type="text" id="note-modal-input" style="width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cfd8dc; border-radius: 8px; margin-bottom: 12px;" placeholder="z. B. 3,99 € oder 2 Packungen" onkeydown="if(event.key==='Enter') saveItemNote()">
       <div style="display: flex; gap: 8px;">
         <button class="btn-modal" style="margin-top: 0;" onclick="saveItemNote()">Speichern</button>
         <button class="btn-modal" style="background: #ffebee; color: #c62828; margin-top: 0;" onclick="clearItemNote()">Löschen</button>
@@ -440,7 +439,7 @@
     let mqttClient = null;
 
     function initLiveSync() {
-      const topic = `einkauf_live_v15/${syncCode}`;
+      const topic = `einkauf_live_v16/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -478,7 +477,7 @@
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v15/${syncCode}`;
+        const topic = `einkauf_live_v16/${syncCode}`;
         const payload = JSON.stringify({
           sender: myClientId,
           store: activeStore,
@@ -632,7 +631,9 @@
     }
 
     /* ----------------------------------------------------
-       ROBUSTER SPRACH- & TEXTPARSER (MIT REAKTIVIERUNG AUS ERLEDIGT)
+       ROBUSTER SPRACH- & TEXTPARSER
+       - Erkennt deutsche Kommazahlen (z. B. 3,99) vollständig
+       - Erlaubt denselben Artikel mehrfach mit unterschiedlicher Bemerkung
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
@@ -661,8 +662,8 @@
       ];
       fillerRegexes.forEach(reg => { text = text.replace(reg, " "); });
 
-      // Satzteile aufteilen
-      const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|[,;]+/);
+      // Satzteile aufteilen (Komma nur wenn gefolgt von Leerzeichen und Buchstaben/Wörtern, nicht mitten in Zahlen wie 3,99!)
+      const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|;\s*|,\s+(?=[a-zA-ZäöüÄÖÜ])/);
 
       segments.forEach(seg => {
         let segmentText = seg.trim();
@@ -682,7 +683,7 @@
 
         if (!segmentText) return;
 
-        // Preis- und Mengenangaben filtern
+        // Preis- und Mengenangaben filtern (erkennt Komma und Punkt: z. B. 3,99 oder 3.99)
         let extraNote = null;
         const priceRegex = /\b(zu|für)?\s*(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g|dose|dosen))\b/i;
         const priceMatch = segmentText.match(priceRegex);
@@ -706,7 +707,7 @@
           articleWord = segmentText.trim();
         }
 
-        const cleanKey = articleWord.toLowerCase().replace(/[,;.:!?]/g, '').trim();
+        const cleanKey = articleWord.toLowerCase().replace(/[;:!?]/g, '').trim();
         const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
         const stopWords = ["bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", "zu", ...marketWords];
 
@@ -715,15 +716,19 @@
         const cat = categoryDict[cleanKey] || "Sonstiges";
         const title = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1);
 
-        // Prüfen, ob Artikel bereits existiert (auch in Erledigt-Liste!)
-        const existingIdx = items.findIndex(i => i.title.toLowerCase() === cleanKey);
+        // Prüfung auf Duplikat: Gleicher Name UND identische Bemerkung
+        const existingIdx = items.findIndex(i => 
+          i.title.toLowerCase() === cleanKey && 
+          (i.note || "").trim().toLowerCase() === (extraNote || "").trim().toLowerCase()
+        );
+
         if (existingIdx > -1) {
-          // Reaktivieren: Aus Erledigt wieder aktiv schalten
+          // Exakt gleicher Artikel mit gleicher Bemerkung -> reaktivieren falls erledigt
           items[existingIdx].done = false;
           items[existingIdx].completedAt = null;
           if (detectedStore) items[existingIdx].targetStore = detectedStore;
-          if (extraNote) items[existingIdx].note = extraNote;
         } else {
+          // Neuer Artikel oder gleicher Artikel mit ANDERER Bemerkung -> separat hinzufügen
           items.push({
             id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
             title: title,
@@ -865,9 +870,7 @@
       }
     }
 
-    /* ----------------------------------------------------
-       NOTIZ- / BEMERKUNGS-MODAL (ZUM BEARBEITEN/KORRIGIEREN)
-       ---------------------------------------------------- */
+    /* Notiz- / Bemerkungs-Modal */
     function openNoteModal(itemId) {
       editingNoteItemId = itemId;
       const item = items.find(i => i.id === itemId);
@@ -1138,7 +1141,6 @@
       }
     }
 
-    // Kompakte Teilen-Funktion (ohne blauen Kasten unten)
     function shareList() {
       const shareUrl = window.location.origin + window.location.pathname + '?sync=' + syncCode;
       navigator.clipboard.writeText(shareUrl).then(() => {
@@ -1172,7 +1174,7 @@
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹";
-      status.textContent = "Aufnahme läuft... (z. B. 'Nudeln 1,99 bei Aldi')";
+      status.textContent = "Aufnahme läuft... (z. B. 'Packe Nudeln zu 1,99€ in die Einkaufsliste')";
 
       try {
         recognition = new SpeechRec();
