@@ -12,10 +12,10 @@
 
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; }
+    body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; overflow-x: hidden; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Kopfleiste oben */
+    /* Fixierte Kopfleiste */
     .top-bar {
       position: sticky;
       top: 0;
@@ -187,10 +187,67 @@
 
     .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
     .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
-    .item-row { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; gap: 8px; }
+    
+    /* Artikel-Zeile & Zeitlupen-Animation */
+    .item-row { 
+      display: flex; 
+      align-items: center; 
+      padding: 8px 10px; 
+      border-bottom: 1px solid #f0f0f0; 
+      gap: 8px; 
+      position: relative;
+      background: white;
+    }
     .item-row:last-child { border-bottom: none; }
     .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; }
     
+    /* Zeitlupen-Abhak-Animation mit Hochschnellen & Absinken */
+    .item-row.checking-out {
+      animation: checkOutSlow 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      pointer-events: none;
+    }
+
+    @keyframes checkOutSlow {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+        background: white;
+      }
+      20% {
+        transform: translateY(-16px) scale(1.03);
+        opacity: 1;
+        background: #e8f5e9;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      }
+      100% {
+        transform: translateY(70px) scale(0.85);
+        opacity: 0;
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin: 0;
+        border: none;
+      }
+    }
+
+    /* Winkender Smiley 👋 */
+    .waving-hand {
+      position: absolute;
+      right: 18px;
+      font-size: 1.4rem;
+      display: inline-block;
+      animation: waveBye 1.2s ease-in-out infinite;
+      z-index: 10;
+    }
+    @keyframes waveBye {
+      0% { transform: rotate(0deg); }
+      20% { transform: rotate(18deg); }
+      40% { transform: rotate(-14deg); }
+      60% { transform: rotate(18deg); }
+      80% { transform: rotate(-8deg); }
+      100% { transform: rotate(0deg); }
+    }
+
     .item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .item-title-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
     .item-name { font-size: 1rem; font-weight: 600; color: #263238; }
@@ -219,7 +276,7 @@
       border-radius: 4px;
     }
 
-    /* Feste Aktions-Buttons */
+    /* Buttons am Artikel */
     .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
     .btn-action-icon {
       background: #f5f5f5;
@@ -315,11 +372,11 @@
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Äpfel 3,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Nudeln 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
-      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch offline).</div>
+      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch 100% offline).</div>
     </div>
   </div>
 
@@ -408,6 +465,9 @@
   </div>
 
   <script>
+    // Feste Standard-Laufwege:
+    // Aldi: Gemüse -> Brot -> Süßigkeiten -> Fleisch und Wurst -> Kühlregal ...
+    // Famila: Brot -> Kühlregal -> Gemüse -> Fleisch und Wurst -> Süßigkeiten ...
     const defaultRoutes = {
       "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"],
       "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"]
@@ -464,7 +524,7 @@
       } catch(e) {}
     }
 
-    // Live-Sync fehlertolerant initialisieren (blockiert offline niemals)
+    // Fehlertoleranter Live-Sync
     function initLiveSync() {
       if (!navigator.onLine || typeof mqtt === 'undefined') {
         const dot = document.getElementById('live-dot');
@@ -472,7 +532,7 @@
         return;
       }
 
-      const topic = `einkauf_live_v22/${syncCode}`;
+      const topic = `einkauf_live_v23/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -521,7 +581,7 @@
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
         try {
-          const topic = `einkauf_live_v22/${syncCode}`;
+          const topic = `einkauf_live_v23/${syncCode}`;
           const payload = JSON.stringify({
             sender: myClientId,
             store: activeStore,
@@ -720,7 +780,7 @@
       ];
       fillerRegexes.forEach(reg => { text = text.replace(reg, " "); });
 
-      // Satzteile trennen (Dezimalkomma wie 3,99 bleibt geschützt)
+      // Satzteile trennen (Dezimalkomma wie 3,99 bleibt ganz)
       const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|;\s*|,\s+(?=[a-zA-ZäöüÄÖÜ])/);
 
       segments.forEach(seg => {
@@ -741,7 +801,7 @@
 
         if (!segmentText) return;
 
-        // Preis- und Mengenangaben filtern (erkennt 3,99 oder 3.99)
+        // Preis- und Mengenangaben filtern (erkennt 3,99 oder 3.99 sauber)
         let extraNote = null;
         const priceRegex = /\b(zu|für)?\s*(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g|dose|dosen))\b/i;
         const priceMatch = segmentText.match(priceRegex);
@@ -811,7 +871,30 @@
       }
     }
 
-    function toggleItem(id) {
+    // Zeitlupen-Abhak-Animation mit Hochschnellen & Absinken
+    function handleCheckWithAnimation(id, checkboxEl) {
+      const rowEl = document.getElementById('row_' + id);
+      if (!rowEl) {
+        toggleItemDirect(id);
+        return;
+      }
+
+      // Zeigt die winkende Hand 👋 an
+      const wave = document.createElement('span');
+      wave.className = 'waving-hand';
+      wave.textContent = '👋';
+      rowEl.appendChild(wave);
+
+      // Startet die Zeitlupen-Animation
+      rowEl.classList.add('checking-out');
+
+      // Nach Abschluss der Zeitlupen-Animation sauber in "Erledigt" überführen
+      setTimeout(() => {
+        toggleItemDirect(id);
+      }, 1300);
+    }
+
+    function toggleItemDirect(id) {
       const item = items.find(i => i.id === id);
       if (item) {
         item.done = !item.done;
@@ -878,7 +961,7 @@
           const noteBadge = item.note ? ` • [${item.note}]` : '';
 
           row.innerHTML = `
-            <input type="checkbox" checked onchange="toggleItem('${item.id}')">
+            <input type="checkbox" checked onchange="toggleItemDirect('${item.id}')">
             <span class="title">${item.title}</span>
             <span class="done-time">${timeString} (${item.category}${storeBadge}${noteBadge})</span>
             <button class="btn-action-icon danger" onclick="safeDeleteItem('${item.id}')" title="Artikel löschen">🗑️</button>
@@ -896,12 +979,13 @@
       itemList.forEach(item => {
         const row = document.createElement('div');
         row.className = "item-row";
+        row.id = "row_" + item.id;
         
         const storeBadgeHtml = item.targetStore ? `<span class="badge-store">verfügbar bei ${item.targetStore}</span>` : '';
         const noteBadgeHtml = item.note ? `<span class="item-extra-note">${item.note}</span>` : '';
 
         row.innerHTML = `
-          <input type="checkbox" onchange="toggleItem('${item.id}')">
+          <input type="checkbox" onchange="handleCheckWithAnimation('${item.id}', this)">
           <div class="item-info">
             <div class="item-title-line">
               <span class="item-name">${item.title}</span>
@@ -1209,7 +1293,7 @@
       navigator.clipboard.writeText(shareUrl).then(() => {
         const status = document.getElementById('mic-status');
         status.textContent = "✅ Sync-Link in die Zwischenablage kopiert!";
-        setTimeout(() => { status.textContent = "Bereit für Eingaben."; }, 4000);
+        setTimeout(() => { status.textContent = "Bereit für Eingaben (funktioniert auch offline)."; }, 4000);
       }).catch(() => {
         prompt("Kopiere diesen Link:", shareUrl);
       });
@@ -1278,13 +1362,13 @@
       const micBtn = document.getElementById('btn-mic');
       micBtn.classList.remove('recording');
       micBtn.textContent = "🎙️";
-      status.textContent = "Bereit für Eingaben.";
+      status.textContent = "Bereit für Eingaben (funktioniert auch offline).";
       if (recognition) {
         try { recognition.stop(); } catch(e) {}
       }
     }
 
-    // Startet die App vollständig lokal
+    // Startet die App zu 100% lokal und unabhängig vom Internet
     initData();
   </script>
 </body>
