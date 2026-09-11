@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Smarte Einkaufsliste</title>
   
-  <!-- Smartphone-App & PWA Optimierung -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#1a237e">
-
-  <!-- Live-Sync Bibliothek (wird offline fehlertolerant übersprungen) -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -98,7 +94,7 @@
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #90a4ae; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
-    /* Supermarkt-Auswahlleiste (dynamisch, scrollbar bei vielen Märkten) */
+    /* Supermarkt-Auswahlleiste */
     .store-bar-scroll {
       display: flex;
       gap: 8px;
@@ -163,7 +159,7 @@
       justify-content: center;
     }
     
-    /* Sprachbutton: Mikrofon im Ruhezustand, rotes Viereck bei Aufnahme */
+    /* Sprachbutton */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -199,7 +195,7 @@
     .item-title-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
     .item-name { font-size: 1rem; font-weight: 600; color: #263238; }
     
-    /* Notiz/Preis Badge */
+    /* Notiz/Preis Tag */
     .item-extra-note {
       display: inline-block;
       background: #fff8e1;
@@ -223,7 +219,7 @@
       border-radius: 4px;
     }
 
-    /* Die Buttons am Artikel */
+    /* Feste Aktions-Buttons am Artikel */
     .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
     .btn-action-icon {
       background: #f5f5f5;
@@ -261,11 +257,10 @@
 </head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
-  <!-- Kopfleiste -->
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
-        <span class="live-indicator" id="live-dot" title="Grau = Lokal/Offline gespeichert, Grün = Live synchronisiert"></span>
+        <span class="live-indicator" id="live-dot" title="Grau = Lokal/Offline, Grün = Live-Sync aktiv"></span>
         <h2>Supermarkt-Laufweg</h2>
       </div>
 
@@ -325,7 +320,7 @@
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
-      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch 100% offline).</div>
+      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch offline).</div>
     </div>
   </div>
 
@@ -414,7 +409,7 @@
   </div>
 
   <script>
-    // Feste Standard-Laufwege:
+    // Standard-Laufwege:
     // Aldi: Gemüse -> Brot -> Süßigkeiten -> Fleisch und Wurst -> Kühlregal ...
     // Famila: Brot -> Kühlregal -> Gemüse -> Fleisch und Wurst -> Süßigkeiten ...
     const defaultRoutes = {
@@ -473,7 +468,7 @@
       } catch(e) {}
     }
 
-    // Live-Sync fehlertolerant initialisieren (verhindert Absturz ohne Netz)
+    // Live-Sync fehlertolerant initialisieren (blockiert niemals offline)
     function initLiveSync() {
       if (!navigator.onLine || typeof mqtt === 'undefined') {
         const dot = document.getElementById('live-dot');
@@ -481,7 +476,7 @@
         return;
       }
 
-      const topic = `einkauf_live_v20/${syncCode}`;
+      const topic = `einkauf_live_v21/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -526,12 +521,12 @@
       }
     }
 
-    // Immer erst lokal speichern, dann im Hintergrund senden falls online
+    // Immer sofort lokal speichern, dann im Hintergrund übertragen
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
         try {
-          const topic = `einkauf_live_v20/${syncCode}`;
+          const topic = `einkauf_live_v21/${syncCode}`;
           const payload = JSON.stringify({
             sender: myClientId,
             store: activeStore,
@@ -540,6 +535,20 @@
           });
           mqttClient.publish(topic, payload, { retain: true, qos: 1 });
         } catch(e) {}
+      }
+    }
+
+    // Lädt bei fehlendem Internet das MQTT-Skript asynchron nach, ohne den Start zu blockieren
+    function loadMqttScriptAsync() {
+      if (typeof mqtt === 'undefined') {
+        const script = document.createElement('script');
+        script.src = "https://unpkg.com/mqtt/dist/mqtt.min.js";
+        script.async = true;
+        script.onload = () => { initLiveSync(); };
+        script.onerror = () => { /* Bleibt still offline */ };
+        document.head.appendChild(script);
+      } else {
+        initLiveSync();
       }
     }
 
@@ -563,13 +572,16 @@
       renderStoreButtons();
       render();
 
-      window.addEventListener('online', initLiveSync);
+      window.addEventListener('online', () => {
+        loadMqttScriptAsync();
+      });
       window.addEventListener('offline', () => {
         const dot = document.getElementById('live-dot');
         if (dot) dot.classList.remove('online');
       });
 
-      initLiveSync();
+      // Asynchroner Start für störungsfreien Offline-Betrieb
+      loadMqttScriptAsync();
     }
 
     function renderStoreButtons() {
@@ -686,7 +698,7 @@
     }
 
     /* ----------------------------------------------------
-       ROBUSTER SPRACH- & TEXTPARSER (AUCH VOLLKOMMEN OFFLINE AKTIV)
+       ROBUSTER SPRACH- & TEXTPARSER (AUCH 100% OFFLINE)
        ---------------------------------------------------- */
     function parseAndAdd(rawText) {
       if (!rawText || !rawText.trim()) return;
@@ -705,7 +717,7 @@
         }
       });
 
-      // Fließtext-Füllphrasen herausfiltern
+      // Befehls- und Füllphrasen herausfiltern
       const fillerRegexes = [
         /\b(packe|pack|schreib|schreibe|setze|setz|tu|packen)\s+(bitte\s+)?/gi,
         /\b(in\s+die\s+einkaufsliste|auf\s+die\s+einkaufsliste|auf\s+die\s+liste|in\s+die\s+liste|zur\s+liste|dazu)\b/gi,
@@ -883,7 +895,6 @@
       }
     }
 
-    // Rendert jeden Artikel mit seinen 3 festen Aktions-Buttons + sicherem Löschbutton
     function createCategoryBlock(catName, itemList) {
       const block = document.createElement('div');
       block.className = "cat-block";
@@ -1280,6 +1291,7 @@
       }
     }
 
+    // Startet die App sofort und 100% blockierfrei
     initData();
   </script>
 </body>
