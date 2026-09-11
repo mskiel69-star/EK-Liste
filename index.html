@@ -197,30 +197,37 @@
       gap: 8px; 
       position: relative;
       background: white;
+      transition: background 0.3s;
     }
     .item-row:last-child { border-bottom: none; }
     .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; }
     
-    /* Zeitlupen-Abhak-Animation mit Hochschnellen & Absinken */
+    /* Noch langsamere Zeitlupe (2.2s) mit spürbarem Anheben & sanftem Absinken */
     .item-row.checking-out {
-      animation: checkOutSlow 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      animation: checkOutSuperSlow 2.2s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
       pointer-events: none;
+      z-index: 10;
     }
 
-    @keyframes checkOutSlow {
+    @keyframes checkOutSuperSlow {
       0% {
         transform: translateY(0) scale(1);
         opacity: 1;
         background: white;
       }
-      20% {
-        transform: translateY(-16px) scale(1.03);
+      22% {
+        transform: translateY(-24px) scale(1.04);
         opacity: 1;
         background: #e8f5e9;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        box-shadow: 0 12px 26px rgba(0,0,0,0.18);
+      }
+      55% {
+        transform: translateY(-16px) scale(1.02);
+        opacity: 0.95;
+        background: #c8e6c9;
       }
       100% {
-        transform: translateY(70px) scale(0.85);
+        transform: translateY(90px) scale(0.8);
         opacity: 0;
         height: 0;
         padding-top: 0;
@@ -230,29 +237,50 @@
       }
     }
 
-    /* Winkender Smiley 👋 */
-    .waving-hand {
+    /* Großer, sehr präsenter winkender Smiley */
+    .waving-badge {
       position: absolute;
-      right: 18px;
-      font-size: 1.4rem;
-      display: inline-block;
-      animation: waveBye 1.2s ease-in-out infinite;
-      z-index: 10;
+      right: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      padding: 5px 12px;
+      border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+      border: 2px solid #81c784;
+      z-index: 20;
+      animation: popIn 0.3s ease-out forwards;
     }
-    @keyframes waveBye {
-      0% { transform: rotate(0deg); }
-      20% { transform: rotate(18deg); }
-      40% { transform: rotate(-14deg); }
-      60% { transform: rotate(18deg); }
-      80% { transform: rotate(-8deg); }
-      100% { transform: rotate(0deg); }
+
+    @keyframes popIn {
+      0% { transform: scale(0.3); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .waving-hand-icon {
+      font-size: 2.1rem;
+      display: inline-block;
+      transform-origin: 70% 70%;
+      animation: waveByeExaggerated 0.65s ease-in-out infinite alternate;
+    }
+
+    @keyframes waveByeExaggerated {
+      0% { transform: rotate(-18deg); }
+      100% { transform: rotate(28deg); }
+    }
+
+    .waving-text {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #2e7d32;
+      letter-spacing: 0.5px;
     }
 
     .item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .item-title-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
     .item-name { font-size: 1rem; font-weight: 600; color: #263238; }
     
-    /* Notiz/Preis Tag */
     .item-extra-note {
       display: inline-block;
       background: #fff8e1;
@@ -524,7 +552,7 @@
       } catch(e) {}
     }
 
-    // Fehlertoleranter Live-Sync
+    // Fehlertoleranter Live-Sync (stört offline nicht)
     function initLiveSync() {
       if (!navigator.onLine || typeof mqtt === 'undefined') {
         const dot = document.getElementById('live-dot');
@@ -532,7 +560,7 @@
         return;
       }
 
-      const topic = `einkauf_live_v23/${syncCode}`;
+      const topic = `einkauf_live_v24/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
@@ -581,7 +609,7 @@
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
         try {
-          const topic = `einkauf_live_v23/${syncCode}`;
+          const topic = `einkauf_live_v24/${syncCode}`;
           const payload = JSON.stringify({
             sender: myClientId,
             store: activeStore,
@@ -871,7 +899,7 @@
       }
     }
 
-    // Zeitlupen-Abhak-Animation mit Hochschnellen & Absinken
+    // Extrem langsame Zeitlupe (2.2s) mit deutlich sichtbarem Winken 👋
     function handleCheckWithAnimation(id, checkboxEl) {
       const rowEl = document.getElementById('row_' + id);
       if (!rowEl) {
@@ -879,19 +907,19 @@
         return;
       }
 
-      // Zeigt die winkende Hand 👋 an
-      const wave = document.createElement('span');
-      wave.className = 'waving-hand';
-      wave.textContent = '👋';
-      rowEl.appendChild(wave);
+      // Großes, auffälliges Winke-Badge mit Text und animierter Hand
+      const badge = document.createElement('div');
+      badge.className = 'waving-badge';
+      badge.innerHTML = `<span class="waving-text">Tschüss!</span><span class="waving-hand-icon">👋</span>`;
+      rowEl.appendChild(badge);
 
       // Startet die Zeitlupen-Animation
       rowEl.classList.add('checking-out');
 
-      // Nach Abschluss der Zeitlupen-Animation sauber in "Erledigt" überführen
+      // Nach 2,2 Sekunden Zeitlupe sauber nach "Erledigt" überführen
       setTimeout(() => {
         toggleItemDirect(id);
-      }, 1300);
+      }, 2150);
     }
 
     function toggleItemDirect(id) {
@@ -1368,7 +1396,7 @@
       }
     }
 
-    // Startet die App zu 100% lokal und unabhängig vom Internet
+    // Startet die App vollständig lokal
     initData();
   </script>
 </body>
