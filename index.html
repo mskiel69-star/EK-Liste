@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Smarte Einkaufsliste</title>
   
-  <!-- Smartphone App / PWA Tags -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#1a237e">
 
-  <!-- Echtzeit Live-Synchronisation (MQTT) -->
+  <!-- MQTT Bibliothek für Live-Sync -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
@@ -19,7 +18,7 @@
     body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Kopfleiste */
+    /* Fixierte Kopfleiste oben */
     .top-bar {
       position: sticky;
       top: 0;
@@ -44,6 +43,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      line-height: 1;
     }
 
     /* Dropdown-Menü */
@@ -94,7 +94,7 @@
     .dropdown-item.danger { color: #c62828; }
     .dropdown-item.danger:hover { background: #ffebee; }
 
-    .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #e53935; display: inline-block; }
+    .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #90a4ae; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
     /* Supermarkt-Auswahlleiste */
@@ -162,7 +162,7 @@
       justify-content: center;
     }
     
-    /* Sprachbutton: Mikrofon im Ruhezustand, Viereck bei Aufnahme */
+    /* Sprachbutton: Mikrofon / Stopp-Viereck */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -190,22 +190,23 @@
 
     .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
     .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
-    .item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; gap: 10px; position: relative; }
+    .item-row { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; gap: 8px; }
     .item-row:last-child { border-bottom: none; }
-    .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
+    .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; }
     
-    .item-info { flex: 1; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
-    .item-title-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-    .item-name { font-size: 1.05rem; font-weight: 500; }
+    .item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .item-title-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .item-name { font-size: 1rem; font-weight: 600; color: #263238; }
     
+    /* Notiz/Preis Tag */
     .item-extra-note {
       display: inline-block;
       background: #fff8e1;
       color: #f57f17;
       border: 1px solid #ffe082;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
-      padding: 1px 7px;
+      padding: 1px 6px;
       border-radius: 4px;
     }
 
@@ -215,70 +216,40 @@
       background: #e8eaf6;
       color: #283593;
       border: 1px solid #c5cae9;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
-      padding: 1px 6px;
+      padding: 1px 5px;
       border-radius: 4px;
     }
 
-    /* Verstecktes Menü pro Zeile (Schutz vor versehentlichem Löschen) */
-    .btn-item-more {
-      background: none;
-      border: none;
-      color: #78909c;
-      font-size: 1.3rem;
-      padding: 4px 8px;
-      cursor: pointer;
-      border-radius: 6px;
-      line-height: 1;
-    }
-    .btn-item-more:active { background: #eceff1; }
-
-    .item-action-popover {
-      display: none;
-      position: absolute;
-      right: 12px;
-      top: 40px;
-      background: white;
+    /* Die Buttons am Artikel */
+    .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-action-icon {
+      background: #f5f5f5;
       border: 1px solid #cfd8dc;
-      border-radius: 8px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-      z-index: 80;
-      min-width: 160px;
-      overflow: hidden;
-    }
-    .item-action-popover.show { display: flex; flex-direction: column; }
-    .popover-btn {
-      width: 100%;
-      padding: 10px 14px;
-      background: none;
-      border: none;
-      text-align: left;
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: #37474f;
+      border-radius: 6px;
+      padding: 5px 6px;
+      font-size: 0.85rem;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 8px;
-      border-bottom: 1px solid #f0f0f0;
+      justify-content: center;
+      line-height: 1;
     }
-    .popover-btn:last-child { border-bottom: none; }
-    .popover-btn:active { background: #f5f5f5; }
-    .popover-btn.danger { color: #c62828; }
-    .popover-btn.danger:active { background: #ffebee; }
+    .btn-action-icon:active { background: #e0e0e0; }
+    .btn-action-icon.danger { color: #d32f2f; border-color: #ffcdd2; background: #ffebee; }
 
     /* Erledigte Artikel */
     .done-wrapper { border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; margin-top: 12px; margin-bottom: 20px; }
     .done-header { background: #e0e0e0; padding: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; position: relative; }
+    .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; }
     .done-item:last-child { border-bottom: none; }
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Modals */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 14px; }
-    .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    /* Modals (Öffnen immer sauber zentriert im Vordergrund der gesamten App) */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 300; justify-content: center; align-items: center; padding: 14px; }
+    .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
     .drag-item { background: #f5f5f5; border: 1px solid #cfd8dc; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
     .drag-item.dragging { opacity: 0.5; background: #e0e0e0; }
@@ -287,12 +258,12 @@
     .btn-cat-choice { padding: 12px 8px; border: 1px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
   </style>
 </head>
-<body onclick="closeAllPopovers(event)">
+<body onclick="closeDropdownIfClickedOutside(event)">
 
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
-        <span class="live-indicator" id="live-dot" title="Sync-Status"></span>
+        <span class="live-indicator" id="live-dot" title="Grau = Lokal/Offline, Grün = Live-Sync aktiv"></span>
         <h2>Supermarkt-Laufweg</h2>
       </div>
 
@@ -324,7 +295,6 @@
       </div>
     </div>
 
-    <!-- Dynamische Supermarkt-Buttons -->
     <div class="store-bar-scroll" id="store-buttons-container"></div>
   </div>
 
@@ -352,7 +322,7 @@
         <button class="btn-add-compact" onclick="addFromInput()">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
-      <div class="status-text" id="mic-status">Bereit für Eingaben.</div>
+      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch offline).</div>
     </div>
   </div>
 
@@ -441,7 +411,7 @@
   </div>
 
   <script>
-    // Feste Standard-Laufwege je Markt
+    // Feste Standard-Laufwege: Aldi startet mit Gemüse, Famila mit Brot
     const defaultRoutes = {
       "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"],
       "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"]
@@ -470,7 +440,6 @@
     let editingItemId = null;
     let editingStoreItemId = null;
     let editingNoteItemId = null;
-    let openPopoverId = null;
 
     const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
     let syncCode = localStorage.getItem('local_sync_code');
@@ -489,13 +458,29 @@
 
     let mqttClient = null;
 
+    // Lokale Speicherung immer an erster Stelle (Local-First für 100% Offline-Fähigkeit)
+    function saveLocalOnly() {
+      try {
+        localStorage.setItem('local_einkaufsliste', JSON.stringify(items));
+        localStorage.setItem('local_einkaufsliste_store', activeStore);
+        localStorage.setItem('local_store_routes', JSON.stringify(storeRoutes));
+        localStorage.setItem('local_category_dict', JSON.stringify(categoryDict));
+      } catch(e) {}
+    }
+
     function initLiveSync() {
-      const topic = `einkauf_live_v18/${syncCode}`;
+      if (!navigator.onLine) {
+        document.getElementById('live-dot').classList.remove('online');
+        return;
+      }
+
+      const topic = `einkauf_live_v19/${syncCode}`;
       try {
         mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
           clientId: myClientId,
           clean: true,
-          connectTimeout: 4000
+          connectTimeout: 3000,
+          reconnectPeriod: 5000
         });
 
         mqttClient.on('connect', () => {
@@ -522,20 +507,28 @@
         mqttClient.on('offline', () => {
           document.getElementById('live-dot').classList.remove('online');
         });
-      } catch(e) {}
+        mqttClient.on('error', () => {
+          document.getElementById('live-dot').classList.remove('online');
+        });
+      } catch(e) {
+        document.getElementById('live-dot').classList.remove('online');
+      }
     }
 
+    // Sofort lokal speichern, danach im Hintergrund live übertragen
     function broadcastState() {
       saveLocalOnly();
       if (mqttClient && mqttClient.connected) {
-        const topic = `einkauf_live_v18/${syncCode}`;
-        const payload = JSON.stringify({
-          sender: myClientId,
-          store: activeStore,
-          items: items,
-          routes: storeRoutes
-        });
-        mqttClient.publish(topic, payload, { retain: true, qos: 1 });
+        try {
+          const topic = `einkauf_live_v19/${syncCode}`;
+          const payload = JSON.stringify({
+            sender: myClientId,
+            store: activeStore,
+            items: items,
+            routes: storeRoutes
+          });
+          mqttClient.publish(topic, payload, { retain: true, qos: 1 });
+        } catch(e) {}
       }
     }
 
@@ -558,14 +551,13 @@
 
       renderStoreButtons();
       render();
-      initLiveSync();
-    }
 
-    function saveLocalOnly() {
-      localStorage.setItem('local_einkaufsliste', JSON.stringify(items));
-      localStorage.setItem('local_einkaufsliste_store', activeStore);
-      localStorage.setItem('local_store_routes', JSON.stringify(storeRoutes));
-      localStorage.setItem('local_category_dict', JSON.stringify(categoryDict));
+      window.addEventListener('online', initLiveSync);
+      window.addEventListener('offline', () => {
+        document.getElementById('live-dot').classList.remove('online');
+      });
+
+      initLiveSync();
     }
 
     function renderStoreButtons() {
@@ -593,15 +585,10 @@
       e.stopPropagation();
       document.getElementById('dropdown-menu').classList.toggle('show');
     }
-
-    function closeAllPopovers(e) {
+    function closeDropdownIfClickedOutside(e) {
       const menu = document.getElementById('dropdown-menu');
       if (menu && menu.classList.contains('show')) menu.classList.remove('show');
-
-      document.querySelectorAll('.item-action-popover').forEach(p => p.classList.remove('show'));
-      openPopoverId = null;
     }
-
     function handleMenuClick(actionFn) {
       document.getElementById('dropdown-menu').classList.remove('show');
       actionFn();
@@ -716,7 +703,7 @@
       ];
       fillerRegexes.forEach(reg => { text = text.replace(reg, " "); });
 
-      // Satzteile trennen (Komma nur vor Wörtern trennen, Dezimalkomma wie 3,99 bleibt ganz)
+      // Satzteile aufteilen (Komma nur vor Wörtern trennen, Dezimalkomma wie 3,99 bleibt ganz)
       const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|;\s*|,\s+(?=[a-zA-ZäöüÄÖÜ])/);
 
       segments.forEach(seg => {
@@ -817,10 +804,15 @@
       }
     }
 
-    function deleteItem(id) {
-      items = items.filter(i => i.id !== id);
-      broadcastState();
-      render();
+    // Sicheres Löschen mit Sicherheitsabfrage (kein versehentliches Löschen)
+    function safeDeleteItem(id) {
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+      if (confirm(`Möchtest du "${item.title}" wirklich von der Liste löschen?`)) {
+        items = items.filter(i => i.id !== id);
+        broadcastState();
+        render();
+      }
     }
 
     function render() {
@@ -873,16 +865,14 @@
             <input type="checkbox" checked onchange="toggleItem('${item.id}')">
             <span class="title">${item.title}</span>
             <span class="done-time">${timeString} (${item.category}${storeBadge}${noteBadge})</span>
-            <button class="btn-item-more" onclick="toggleItemPopover(event, 'pop_done_${item.id}')">⋮</button>
-            <div class="item-action-popover" id="pop_done_${item.id}">
-              <button class="popover-btn danger" onclick="deleteItem('${item.id}')">🗑️ Löschen</button>
-            </div>
+            <button class="btn-action-icon danger" onclick="safeDeleteItem('${item.id}')" title="Artikel löschen">🗑️</button>
           `;
           doneListContainer.appendChild(row);
         });
       }
     }
 
+    // Rendert die Artikelzeile mit den drei festen Buttons + sicherem Löschbutton
     function createCategoryBlock(catName, itemList) {
       const block = document.createElement('div');
       block.className = "cat-block";
@@ -895,38 +885,25 @@
         const storeBadgeHtml = item.targetStore ? `<span class="badge-store">verfügbar bei ${item.targetStore}</span>` : '';
         const noteBadgeHtml = item.note ? `<span class="item-extra-note">${item.note}</span>` : '';
 
-        // Das Löschenkreuz ist jetzt im 3-Punkte-Menü (⋮) sicher vor versehentlichem Antippen versteckt
         row.innerHTML = `
           <input type="checkbox" onchange="toggleItem('${item.id}')">
-          <div class="item-info" onclick="openNoteModal('${item.id}')">
+          <div class="item-info">
             <div class="item-title-line">
               <span class="item-name">${item.title}</span>
               ${noteBadgeHtml}
             </div>
             ${storeBadgeHtml}
           </div>
-          <button class="btn-item-more" onclick="toggleItemPopover(event, 'pop_${item.id}')">⋮</button>
-          <div class="item-action-popover" id="pop_${item.id}">
-            <button class="popover-btn" onclick="openNoteModal('${item.id}')">📝 Bemerkung / Preis</button>
-            <button class="popover-btn" onclick="openItemStoreModal('${item.id}')">🏬 Supermarkt</button>
-            <button class="popover-btn" onclick="openCategoryModal('${item.id}')">📁 Abteilung</button>
-            <button class="popover-btn danger" onclick="deleteItem('${item.id}')">🗑️ Löschen</button>
+          <div class="item-actions">
+            <button class="btn-action-icon" title="Bemerkung / Preis korrigieren" onclick="openNoteModal('${item.id}')">📝</button>
+            <button class="btn-action-icon" title="Supermarkt festlegen" onclick="openItemStoreModal('${item.id}')">🏬</button>
+            <button class="btn-action-icon" title="Kategorie / Abteilung ändern" onclick="openCategoryModal('${item.id}')">📁</button>
+            <button class="btn-action-icon danger" title="Artikel sicher löschen" onclick="safeDeleteItem('${item.id}')">🗑️</button>
           </div>
         `;
         block.appendChild(row);
       });
       return block;
-    }
-
-    function toggleItemPopover(e, popoverId) {
-      e.stopPropagation();
-      const popover = document.getElementById(popoverId);
-      const isAlreadyOpen = popover.classList.contains('show');
-      closeAllPopovers(e);
-      if (!isAlreadyOpen) {
-        popover.classList.add('show');
-        openPopoverId = popoverId;
-      }
     }
 
     function toggleDoneSection() {
@@ -1216,7 +1193,7 @@
       const shareUrl = window.location.origin + window.location.pathname + '?sync=' + syncCode;
       navigator.clipboard.writeText(shareUrl).then(() => {
         const status = document.getElementById('mic-status');
-        status.textContent = "✅ Sync-Link in die Zwischenablage kopiert!";
+        status.textContent = "✅ Sync-Link kopiert! Sende ihn per WhatsApp/Messenger weiter.";
         setTimeout(() => { status.textContent = "Bereit für Eingaben."; }, 4000);
       }).catch(() => {
         prompt("Kopiere diesen Link:", shareUrl);
@@ -1245,7 +1222,7 @@
       keepRecording = true;
       micBtn.classList.add('recording');
       micBtn.textContent = "⏹";
-      status.textContent = "Aufnahme läuft... (z. B. 'Nudeln 1,99 bei Aldi')";
+      status.textContent = "Aufnahme läuft... (z. B. 'Packe Nudeln zu 1,99€ in die Einkaufsliste')";
 
       try {
         recognition = new SpeechRec();
