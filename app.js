@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.2.0';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.2.1';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -69,7 +69,7 @@ function networkStatus(){
  $('live-dot').classList.toggle('online',ready.length>0);
  $('live-dot').title=ready.length?'Synchronisationsserver erreichbar':'Nur auf diesem Gerät gespeichert';
  let message=!navigator.onLine?'Offline · Änderungen bleiben auf diesem Gerät gespeichert.':ready.length?(peers?'Zweites Gerät auf dieser Liste bestätigt':'Server verbunden · Noch kein zweites Gerät bestätigt')+(pendingSync?' · Übertragung ausstehend.':' · An Server übertragen.'):'Server nicht erreichbar oder verbindet · Änderungen bleiben lokal gespeichert.';
- $('app-state').textContent='v'+APP_VERSION+' · Liste '+listLabel()+' · '+message;
+ $('app-state').textContent='Liste '+listLabel()+' · '+message;
  const diagnostic=$('sync-diagnostic');if(diagnostic)diagnostic.textContent=$('app-state').textContent;
 }
 async function restoreLegacyPairing(){
@@ -84,7 +84,7 @@ async function restoreLegacyPairing(){
   persist();const previous=records,next=clone(db.rooms[restored]||{});
   for(const [id,r]of Object.entries(previous))if(newer(r,next[id]))next[id]=clone(r);
   syncCode=restored;records=next;db.legacySyncMigrated=true;materialize();persist();renderStoreButtons();render();
-  status('Frühere Geräteverknüpfung wiederhergestellt. Bitte beide Handys auf Version '+APP_VERSION+' aktualisieren.');
+  status('Frühere Geräteverknüpfung wiederhergestellt. Bitte beide Handys aktualisieren.');
  })();return legacyMigration;
 }
 async function encryptedPacket(data){const iv=crypto.getRandomValues(new Uint8Array(12));const bytes=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(data)));return JSON.stringify({iv:b64(iv),body:b64(bytes)})}
@@ -230,4 +230,5 @@ function applyUpdate(){waitingWorker=reg?.waiting||waitingWorker;if(!waitingWork
 for(const overlay of document.querySelectorAll('.modal-overlay')){overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none'})}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of document.querySelectorAll('.modal-overlay'))o.style.display='none';$('dropdown-menu').classList.remove('show')}if(e.key==='Tab'){const modal=[...document.querySelectorAll('.modal-overlay')].find(o=>o.style.display==='flex');if(modal){const focus=[...modal.querySelectorAll('button,input,select')].filter(x=>!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus()}}}});
 $('manual-input').addEventListener('input',renderSuggestions);
+$('app-version').textContent='Version '+APP_VERSION;
 init();

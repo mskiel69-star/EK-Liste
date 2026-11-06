@@ -348,7 +348,7 @@
           <button class="btn-menu-toggle" onclick="toggleDropdownMenu(event)">
             ⚙️ Optionen ▾
           </button>
-          <div class="dropdown-menu" id="dropdown-menu"><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
+          <div class="dropdown-menu" id="dropdown-menu"><div id="app-version" class="dropdown-item" style="cursor:default;font-size:0.8rem;color:#607661" role="note"></div><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
             <button class="dropdown-item" onclick="handleMenuClick(openRouteModal)">
               ⚙️ Laufweg ordnen
             </button>
