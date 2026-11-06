@@ -2,8 +2,8 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Smarte Einkaufsliste</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Maiks Einkaufsliste</title><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg">
   
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,6 @@
     body { margin: 0; padding: 0 0 110px 0; background: #eceff1; color: #263238; overflow-x: hidden; }
     .container { max-width: 600px; margin: 0 auto; padding: 12px; }
 
-    /* Fixierte Kopfleiste */
     .top-bar {
       position: sticky;
       top: 0;
@@ -43,7 +42,6 @@
       line-height: 1;
     }
 
-    /* Dropdown-Menü */
     .menu-container { position: relative; }
     .btn-menu-toggle {
       background: #eceff1;
@@ -94,7 +92,6 @@
     .live-indicator { width: 10px; height: 10px; border-radius: 50%; background: #90a4ae; display: inline-block; }
     .live-indicator.online { background: #43a047; }
     
-    /* Supermarkt-Auswahlleiste */
     .store-bar-scroll {
       display: flex;
       gap: 8px;
@@ -117,7 +114,6 @@
     }
     .btn-store.active { background: #3f51b5; color: white; }
 
-    /* Fixierte Eingabeleiste unten */
     .bottom-input-bar {
       position: fixed;
       bottom: 0;
@@ -159,7 +155,6 @@
       justify-content: center;
     }
     
-    /* Sprachbutton */
     .btn-mic-icon-only {
       width: 44px;
       height: 42px;
@@ -181,14 +176,12 @@
     }
     .status-text { font-size: 0.72rem; color: #546e7a; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Listen-Karten */
     .card { background: white; padding: 14px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin-top: 10px; margin-bottom: 14px; }
     h2 { margin: 0 0 10px 0; font-size: 1.05rem; color: #1a237e; }
 
     .cat-block { margin-bottom: 12px; border: 1px solid #cfd8dc; border-radius: 8px; overflow: hidden; background: white; }
     .cat-header { background: #cfd8dc; padding: 8px 12px; font-weight: bold; font-size: 0.95rem; color: #263238; }
     
-    /* Artikel-Zeile & Zeitlupen-Animation */
     .item-row { 
       display: flex; 
       align-items: center; 
@@ -202,9 +195,8 @@
     .item-row:last-child { border-bottom: none; }
     .item-row input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; }
     
-    /* Noch langsamere Zeitlupe (2.2s) mit spürbarem Anheben & sanftem Absinken */
     .item-row.checking-out {
-      animation: checkOutSuperSlow 2.2s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+      animation: checkOutSuperSlow 2.5s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
       pointer-events: none;
       z-index: 10;
     }
@@ -237,7 +229,6 @@
       }
     }
 
-    /* Großer, sehr präsenter winkender Smiley */
     .waving-badge {
       position: absolute;
       right: 14px;
@@ -304,7 +295,6 @@
       border-radius: 4px;
     }
 
-    /* Buttons am Artikel */
     .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
     .btn-action-icon {
       background: #f5f5f5;
@@ -321,7 +311,6 @@
     .btn-action-icon:active { background: #e0e0e0; }
     .btn-action-icon.danger { color: #d32f2f; border-color: #ffcdd2; background: #ffebee; }
 
-    /* Erledigte Artikel */
     .done-wrapper { border: 1px solid #cfd8dc; border-radius: 8px; background: white; overflow: hidden; margin-top: 12px; margin-bottom: 20px; }
     .done-header { background: #e0e0e0; padding: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .done-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f5f5f5; gap: 10px; color: #78909c; }
@@ -329,7 +318,6 @@
     .done-item span.title { flex: 1; text-decoration: line-through; }
     .done-time { font-size: 0.75rem; color: #90a4ae; }
 
-    /* Modals */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 300; justify-content: center; align-items: center; padding: 14px; }
     .modal { background: white; border-radius: 12px; padding: 18px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
     .drag-list { list-style: none; padding: 0; margin: 12px 0; }
@@ -339,14 +327,16 @@
     .cat-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
     .btn-cat-choice { padding: 12px 8px; border: 1px solid #90caf9; background: #e3f2fd; color: #0d47a1; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
   </style>
-</head>
+<style>
+:root {color-scheme:light}body{background:#f3f5ee;color:#213b30}.top-bar{padding:20px max(16px,calc((100vw - 660px)/2));box-shadow:none;border-color:#dce4d6}.store-header-row h2{font-size:1.22rem;color:#203c30}.store-header-row{margin-bottom:18px}.container,.input-inner-wrap{max-width:660px}.container{padding:16px}.card{box-shadow:none;background:transparent;padding:0}.btn-store{border-radius:24px;border:1px solid #cbd9ca;color:#345541;padding:10px 22px}.btn-store.active,.btn-modal{background:#285c45;color:white}.cat-block{border:1px solid #dce4d6;border-radius:15px;margin-bottom:18px}.cat-header{background:#e5ebdf;padding:12px 15px;font-size:.85rem;color:#3b5848}.item-row{padding:14px 12px;min-height:68px}.item-row input[type=checkbox]{accent-color:#285c45;width:26px;height:26px}.item-name{color:#213b30}.btn-action-icon{min-width:32px;min-height:36px;border:0;background:#f2f5ef}.bottom-input-bar{padding:14px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px #203c300d;border-color:#dce4d6}.compact-row input[type=text]{min-width:0;padding:14px}.btn-add-compact{background:#285c45;width:48px;height:48px}.btn-mic-icon-only{height:48px;width:48px;background:#415f50}.status-text{white-space:normal;min-height:20px;line-height:1.4;padding-top:6px}.notice{max-width:628px;margin:14px auto 0;padding:12px 16px;background:#e4ebdb;border-radius:10px;font-size:.84rem;line-height:1.5}.notice button{padding:8px;border:1px solid #a6b9a2;border-radius:7px;background:white;margin:4px}.list-heading{display:flex;justify-content:space-between;align-items:center;margin:8px 0 18px}.list-heading h2{font-size:1.6rem;color:#203c30;margin:0}#count{color:#56705b;font-size:.85rem}.empty{padding:50px 20px;text-align:center;color:#607661;line-height:1.7}.done-wrapper{border-color:#dce4d6;border-radius:12px}.done-header{background:#e5ebdf}.item-info{cursor:pointer}.drag-item button{min-width:34px;min-height:36px}.item-actions{gap:0}.btn-menu-toggle,.btn-share-icon{min-height:40px;background:#f3f5ee;border-color:#dce4d6}.modal-overlay{overscroll-behavior:contain}.modal h2{color:#285c45}.modal input{min-width:0}button:focus-visible,input:focus-visible{outline:3px solid #bc7400;outline-offset:3px}button{touch-action:manipulation}#update[hidden]{display:none}@media(max-width:400px){.item-actions .secondary{display:none}.store-header-row h2{font-size:1rem}.notice{margin-left:12px;margin-right:12px}.header-actions{gap:4px}}@media(prefers-reduced-motion:reduce){.item-row.checking-out{animation:none}.waving-hand-icon{animation:none}} 
+</style></head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
   <div class="top-bar">
     <div class="store-header-row">
       <div style="display: flex; align-items: center; gap: 6px;">
         <span class="live-indicator" id="live-dot" title="Grau = Lokal/Offline gespeichert, Grün = Live synchronisiert"></span>
-        <h2>Supermarkt-Laufweg</h2>
+        <h2>Maiks Einkaufsliste</h2>
       </div>
 
       <div class="header-actions">
@@ -356,7 +346,7 @@
           <button class="btn-menu-toggle" onclick="toggleDropdownMenu(event)">
             ⚙️ Optionen ▾
           </button>
-          <div class="dropdown-menu" id="dropdown-menu">
+          <div class="dropdown-menu" id="dropdown-menu"><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
             <button class="dropdown-item" onclick="handleMenuClick(openRouteModal)">
               ⚙️ Laufweg ordnen
             </button>
@@ -367,10 +357,10 @@
               🔗 Sync-Link kopieren
             </button>
             <button class="dropdown-item" onclick="handleMenuClick(openSyncModal)">
-              🔄 Sync-Code ändern
+              🔄 Geräte verknüpfen
             </button>
             <button class="dropdown-item danger" onclick="handleMenuClick(resetAllData)">
-              🧹 Reset
+              🧹 Liste leeren
             </button>
           </div>
         </div>
@@ -380,13 +370,12 @@
     <div class="store-bar-scroll" id="store-buttons-container"></div>
   </div>
 
-  <div class="container">
+  <div id="app-state" role="status" class="notice">Offline-Speicher wird vorbereitet …</div><div id="update" class="notice" hidden>Eine neue App-Version ist verfügbar. Jetzt übernehmen? <button onclick="applyUpdate()">Jetzt aktualisieren</button> <button onclick="this.parentNode.hidden=true">Später</button></div><div class="container">
     <div class="card">
-      <h2>Einkaufsliste</h2>
+      <div class="list-heading"><h2>Dein Einkauf</h2><span id="count"></span></div>
       <div id="list-container">Keine Artikel auf der Liste.</div>
     </div>
 
-    <!-- Erledigte Artikel -->
     <div class="done-wrapper">
       <div class="done-header" onclick="toggleDoneSection()">
         <span id="done-counter">Erledigte Artikel (0)</span>
@@ -396,19 +385,17 @@
     </div>
   </div>
 
-  <!-- Fixierte Eingabeleiste unten -->
   <div class="bottom-input-bar">
     <div class="input-inner-wrap">
       <div class="compact-row">
-        <input type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Nudeln 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
-        <button class="btn-add-compact" onclick="addFromInput()">+</button>
+        <input aria-label="Artikel eingeben" type="text" id="manual-input" placeholder="Artikel [Zusatz/Preis] (z.B. Nudeln 1,99)..." onkeydown="if(event.key==='Enter') addFromInput()">
+        <button class="btn-add-compact" onclick="addFromInput()" aria-label="Artikel hinzufügen">+</button>
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
-      <div class="status-text" id="mic-status">Bereit für Eingaben (funktioniert auch 100% offline).</div>
+      <div class="status-text" id="mic-status">Tastatureingabe funktioniert offline. Sprache je nach Browser.</div>
     </div>
   </div>
 
-  <!-- Supermarkt-Manager Modal -->
   <div class="modal-overlay" id="store-manager-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Supermärkte verwalten</h2>
@@ -426,7 +413,6 @@
     </div>
   </div>
 
-  <!-- Laufweg Modal -->
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;"></span></h2>
@@ -445,7 +431,6 @@
     </div>
   </div>
 
-  <!-- Kategorie-Zuweisung Modal -->
   <div class="modal-overlay" id="category-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Kategorie ändern für: <span id="change-item-title" style="color: #00897b;"></span></h2>
@@ -455,7 +440,6 @@
     </div>
   </div>
 
-  <!-- Markt-Zuweisung Modal -->
   <div class="modal-overlay" id="item-store-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Supermarkt festlegen für: <span id="item-store-target-title" style="color: #00897b;"></span></h2>
@@ -465,7 +449,6 @@
     </div>
   </div>
 
-  <!-- Notiz / Bemerkung bearbeiten Modal -->
   <div class="modal-overlay" id="note-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Bemerkung / Preis für <span id="note-modal-title" style="color: #00897b;"></span></h2>
@@ -479,11 +462,10 @@
     </div>
   </div>
 
-  <!-- Sync Modal -->
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Live-Synchronisation</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Geräte mit demselben Code gleichen sich automatisch in Echtzeit ab:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Verknüpfte Geräte gleichen Änderungen bei Internetverbindung ab. Der geheime Link erlaubt den Zugriff auf die Liste. Nur vertraut teilen. Verknüpfte Personen öffnen diesen Link auf ihrem eigenen Gerät.</p>
       <div style="display: flex; gap: 6px; margin: 10px 0;">
         <input type="text" id="sync-code-input" style="flex:1; padding:10px; border:1px solid #cfd8dc; border-radius:6px; font-weight:bold;">
         <button class="btn-add-compact" style="width: auto; padding: 0 14px; font-size: 0.9rem;" onclick="saveSyncCode()">Verbinden</button>
@@ -492,912 +474,4 @@
     </div>
   </div>
 
-  <script>
-    // Feste Standard-Laufwege:
-    // Aldi: Gemüse -> Brot -> Süßigkeiten -> Fleisch und Wurst -> Kühlregal ...
-    // Famila: Brot -> Kühlregal -> Gemüse -> Fleisch und Wurst -> Süßigkeiten ...
-    const defaultRoutes = {
-      "Aldi": ["Gemüse", "Brot", "Süßigkeiten", "Fleisch und Wurst", "Kühlregal", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"],
-      "Famila": ["Brot", "Kühlregal", "Gemüse", "Fleisch und Wurst", "Süßigkeiten", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"]
-    };
-
-    const initialDict = {
-      "nudeln": "Nudeln und Getreide", "spaghetti": "Nudeln und Getreide", "reis": "Nudeln und Getreide",
-      "äpfel": "Gemüse", "apfel": "Gemüse", "banane": "Gemüse", "bananen": "Gemüse", "kartoffel": "Gemüse", "kartoffeln": "Gemüse", 
-      "tomate": "Gemüse", "tomaten": "Gemüse", "gurke": "Gemüse", "gurken": "Gemüse", "salat": "Gemüse", "birne": "Gemüse", 
-      "birnen": "Gemüse", "paprika": "Gemüse", "zucchini": "Gemüse", "zwiebel": "Gemüse", "zwiebeln": "Gemüse", "knoblauch": "Gemüse", 
-      "möhren": "Gemüse", "karotten": "Gemüse", "brokkoli": "Gemüse", "champignons": "Gemüse", "pilze": "Gemüse", "avocado": "Gemüse",
-      "zitrone": "Gemüse", "zitronen": "Gemüse", "orange": "Gemüse", "orangen": "Gemüse", "spinat": "Gemüse", "lauch": "Gemüse", "porree": "Gemüse",
-      "brot": "Brot", "brötchen": "Brot", "baguette": "Brot", "roggenbrot": "Brot", "dinkelbrot": "Brot", "toast": "Brot", "mehl": "Brot", "hefe": "Brot",
-      "schokolade": "Süßigkeiten", "chips": "Süßigkeiten", "kekse": "Süßigkeiten", "keks": "Süßigkeiten", "gummibärchen": "Süßigkeiten",
-      "hackfleisch": "Fleisch und Wurst", "hack": "Fleisch und Wurst", "salami": "Fleisch und Wurst", "bratwurst": "Fleisch und Wurst",
-      "schinken": "Fleisch und Wurst", "wurst": "Fleisch und Wurst", "hähnchen": "Fleisch und Wurst", "steak": "Fleisch und Wurst",
-      "milch": "Kühlregal", "butter": "Kühlregal", "käse": "Kühlregal", "quark": "Kühlregal", "joghurt": "Kühlregal", "sahne": "Kühlregal", "eier": "Kühlregal", "ei": "Kühlregal",
-      "wasser": "Getränke", "bier": "Getränke", "cola": "Getränke", "saft": "Getränke", "kaffee": "Getränke", "tee": "Getränke",
-      "toilettenpapier": "Drogerie", "klopapier": "Drogerie", "küchenrolle": "Drogerie", "seife": "Drogerie", "shampoo": "Drogerie"
-    };
-
-    let storeRoutes = JSON.parse(JSON.stringify(defaultRoutes));
-    let categoryDict = Object.assign({}, initialDict);
-    let activeStore = "Aldi";
-    let items = [];
-    let editingItemId = null;
-    let editingStoreItemId = null;
-    let editingNoteItemId = null;
-
-    const myClientId = 'client_' + Math.random().toString(36).substring(2, 9);
-    let syncCode = localStorage.getItem('local_sync_code');
-    if (!syncCode) {
-      syncCode = "familie_" + Math.random().toString(36).substring(2, 7);
-      localStorage.setItem('local_sync_code', syncCode);
-    }
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedCode = urlParams.get('sync');
-    if (sharedCode) {
-      syncCode = sharedCode;
-      localStorage.setItem('local_sync_code', syncCode);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    let mqttClient = null;
-
-    // 100% Offline-sichere lokale Speicherung
-    function saveLocalOnly() {
-      try {
-        localStorage.setItem('local_einkaufsliste', JSON.stringify(items));
-        localStorage.setItem('local_einkaufsliste_store', activeStore);
-        localStorage.setItem('local_store_routes', JSON.stringify(storeRoutes));
-        localStorage.setItem('local_category_dict', JSON.stringify(categoryDict));
-      } catch(e) {}
-    }
-
-    // Fehlertoleranter Live-Sync (stört offline nicht)
-    function initLiveSync() {
-      if (!navigator.onLine || typeof mqtt === 'undefined') {
-        const dot = document.getElementById('live-dot');
-        if (dot) dot.classList.remove('online');
-        return;
-      }
-
-      const topic = `einkauf_live_v24/${syncCode}`;
-      try {
-        mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
-          clientId: myClientId,
-          clean: true,
-          connectTimeout: 3000,
-          reconnectPeriod: 6000
-        });
-
-        mqttClient.on('connect', () => {
-          const dot = document.getElementById('live-dot');
-          if (dot) dot.classList.add('online');
-          mqttClient.subscribe(topic);
-        });
-
-        mqttClient.on('message', (t, msg) => {
-          try {
-            const data = JSON.parse(msg.toString());
-            if (data.sender === myClientId) return;
-
-            if (data && Array.isArray(data.items)) {
-              items = data.items;
-              if (data.routes) storeRoutes = data.routes;
-              if (data.store && storeRoutes[data.store]) activeStore = data.store;
-              saveLocalOnly();
-              renderStoreButtons();
-              render();
-            }
-          } catch(e) {}
-        });
-
-        mqttClient.on('offline', () => {
-          const dot = document.getElementById('live-dot');
-          if (dot) dot.classList.remove('online');
-        });
-        mqttClient.on('error', () => {
-          const dot = document.getElementById('live-dot');
-          if (dot) dot.classList.remove('online');
-        });
-      } catch(e) {
-        const dot = document.getElementById('live-dot');
-        if (dot) dot.classList.remove('online');
-      }
-    }
-
-    function broadcastState() {
-      saveLocalOnly();
-      if (mqttClient && mqttClient.connected) {
-        try {
-          const topic = `einkauf_live_v24/${syncCode}`;
-          const payload = JSON.stringify({
-            sender: myClientId,
-            store: activeStore,
-            items: items,
-            routes: storeRoutes
-          });
-          mqttClient.publish(topic, payload, { retain: true, qos: 1 });
-        } catch(e) {}
-      }
-    }
-
-    function loadMqttScriptAsync() {
-      if (typeof mqtt === 'undefined') {
-        const script = document.createElement('script');
-        script.src = "https://unpkg.com/mqtt/dist/mqtt.min.js";
-        script.async = true;
-        script.onload = () => { initLiveSync(); };
-        script.onerror = () => { /* Bleibt ohne Störung offline */ };
-        document.head.appendChild(script);
-      } else {
-        initLiveSync();
-      }
-    }
-
-    function initData() {
-      const savedDict = localStorage.getItem('local_category_dict');
-      if (savedDict) {
-        try { Object.assign(categoryDict, JSON.parse(savedDict)); } catch(e) {}
-      }
-      const savedRoutes = localStorage.getItem('local_store_routes');
-      if (savedRoutes) {
-        try { storeRoutes = JSON.parse(savedRoutes); } catch(e) {}
-      }
-      const savedItems = localStorage.getItem('local_einkaufsliste');
-      if (savedItems) {
-        try { items = JSON.parse(savedItems); } catch(e) {}
-      }
-      const savedStore = localStorage.getItem('local_einkaufsliste_store');
-      if (savedStore && storeRoutes[savedStore]) activeStore = savedStore;
-      else activeStore = Object.keys(storeRoutes)[0] || "Aldi";
-
-      renderStoreButtons();
-      render();
-
-      window.addEventListener('online', () => {
-        loadMqttScriptAsync();
-      });
-      window.addEventListener('offline', () => {
-        const dot = document.getElementById('live-dot');
-        if (dot) dot.classList.remove('online');
-      });
-
-      loadMqttScriptAsync();
-    }
-
-    function renderStoreButtons() {
-      const container = document.getElementById('store-buttons-container');
-      container.innerHTML = "";
-      const storeNames = Object.keys(storeRoutes);
-
-      storeNames.forEach(storeName => {
-        const btn = document.createElement('button');
-        btn.className = 'btn-store ' + (storeName.toLowerCase() === activeStore.toLowerCase() ? 'active' : '');
-        btn.textContent = storeName;
-        btn.onclick = () => switchStore(storeName);
-        container.appendChild(btn);
-      });
-    }
-
-    function switchStore(storeName) {
-      activeStore = storeName;
-      renderStoreButtons();
-      broadcastState();
-      render();
-    }
-
-    function toggleDropdownMenu(e) {
-      e.stopPropagation();
-      document.getElementById('dropdown-menu').classList.toggle('show');
-    }
-    function closeDropdownIfClickedOutside(e) {
-      const menu = document.getElementById('dropdown-menu');
-      if (menu && menu.classList.contains('show')) menu.classList.remove('show');
-    }
-    function handleMenuClick(actionFn) {
-      document.getElementById('dropdown-menu').classList.remove('show');
-      actionFn();
-    }
-
-    function resetAllData() {
-      const confirmed = confirm("Möchtest du wirklich alles zurücksetzen?\n\nAlle Artikel und temporären Speicher werden gelöscht.");
-      if (confirmed) {
-        items = [];
-        localStorage.removeItem('local_einkaufsliste');
-        broadcastState();
-        render();
-        location.reload();
-      }
-    }
-
-    /* Supermärkte verwalten */
-    function openStoreManagerModal() {
-      renderStoreManagerList();
-      document.getElementById('store-manager-modal').style.display = 'flex';
-    }
-    function closeStoreManagerModal() {
-      document.getElementById('store-manager-modal').style.display = 'none';
-    }
-
-    function renderStoreManagerList() {
-      const container = document.getElementById('store-list-container');
-      container.innerHTML = "";
-      const storeNames = Object.keys(storeRoutes);
-
-      storeNames.forEach(name => {
-        const li = document.createElement('li');
-        li.className = "drag-item";
-        const canDelete = storeNames.length > 1;
-
-        li.innerHTML = `
-          <span style="font-weight:bold; font-size:0.95rem;">${name}</span>
-          ${canDelete ? `<button onclick="deleteStore('${name}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:#e53935;" title="Supermarkt löschen">🗑️</button>` : `<span style="font-size:0.75rem; color:#9e9e9e;">Standard</span>`}
-        `;
-        container.appendChild(li);
-      });
-    }
-
-    function addNewStore() {
-      const input = document.getElementById('new-store-input');
-      const val = input.value.trim();
-      if (!val) return;
-      const formattedName = val.charAt(0).toUpperCase() + val.slice(1);
-
-      if (storeRoutes[formattedName]) {
-        alert("Dieser Supermarkt existiert bereits!");
-        return;
-      }
-
-      const baseCategories = storeRoutes[activeStore] || ["Gemüse", "Brot", "Kühlregal", "Fleisch und Wurst", "Süßigkeiten", "Nudeln und Getreide", "Getränke", "Drogerie", "Sonstiges"];
-      storeRoutes[formattedName] = [...baseCategories];
-
-      activeStore = formattedName;
-      input.value = "";
-      saveLocalOnly();
-      renderStoreManagerList();
-      renderStoreButtons();
-      broadcastState();
-      render();
-    }
-
-    function deleteStore(storeName) {
-      if (Object.keys(storeRoutes).length <= 1) return;
-      if (confirm(`Möchtest du den Supermarkt "${storeName}" wirklich löschen?`)) {
-        delete storeRoutes[storeName];
-        if (activeStore === storeName) {
-          activeStore = Object.keys(storeRoutes)[0];
-        }
-        items.forEach(item => {
-          if (item.targetStore === storeName) item.targetStore = null;
-        });
-        saveLocalOnly();
-        renderStoreManagerList();
-        renderStoreButtons();
-        broadcastState();
-        render();
-      }
-    }
-
-    /* ----------------------------------------------------
-       ROBUSTER SPRACH- & TEXTPARSER (AUCH 100% OFFLINE)
-       ---------------------------------------------------- */
-    function parseAndAdd(rawText) {
-      if (!rawText || !rawText.trim()) return;
-      let text = rawText.trim();
-
-      if (text.toLowerCase().includes("aufnahme beenden") || text.toLowerCase().includes("stop")) {
-        stopVoice();
-        return;
-      }
-
-      // Marktwechsel auf Zuruf (z. B. "Aldi" oder "Famila")
-      Object.keys(storeRoutes).forEach(storeName => {
-        const sLower = storeName.toLowerCase();
-        if (text.toLowerCase() === sLower || text.toLowerCase() === `zu ${sLower}` || text.toLowerCase() === `bei ${sLower}`) {
-          switchStore(storeName);
-        }
-      });
-
-      // Befehls- und Füllphrasen herausfiltern
-      const fillerRegexes = [
-        /\b(packe|pack|schreib|schreibe|setze|setz|tu|packen)\s+(bitte\s+)?/gi,
-        /\b(in\s+die\s+einkaufsliste|auf\s+die\s+einkaufsliste|auf\s+die\s+liste|in\s+die\s+liste|zur\s+liste|dazu)\b/gi,
-        /\b(ich\s+brauche\s+noch|wir\s+brauchen\s+noch|ich\s+brauche|wir\s+brauchen)\b/gi,
-        /\b(brauche\s+ich|brauchen\s+wir|ich\s+möchte|wir\s+möchten)\b/gi,
-        /\b(kauf\s+bitte|kaufe\s+bitte|bring\s+bitte\s+mit|bring\s+mit|besorge\s+bitte)\b/gi
-      ];
-      fillerRegexes.forEach(reg => { text = text.replace(reg, " "); });
-
-      // Satzteile trennen (Dezimalkomma wie 3,99 bleibt ganz)
-      const segments = text.split(/[\s,;]+und\s+|[\s,;]+sowie\s+|;\s*|,\s+(?=[a-zA-ZäöüÄÖÜ])/);
-
-      segments.forEach(seg => {
-        let segmentText = seg.trim();
-        if (!segmentText) return;
-
-        let detectedStore = null;
-
-        // Supermarkt-Zuweisung prüfen (z. B. "bei Aldi" / "bei Famila")
-        Object.keys(storeRoutes).forEach(storeName => {
-          const sLower = storeName.toLowerCase();
-          const storeRegex = new RegExp(`\\b(bei|nur bei|nur im|im|für)\\s+${sLower}\\b|\\b${sLower}\\b`, 'i');
-          if (storeRegex.test(segmentText)) {
-            detectedStore = storeName;
-            segmentText = segmentText.replace(storeRegex, ' ').trim();
-          }
-        });
-
-        if (!segmentText) return;
-
-        // Preis- und Mengenangaben filtern (erkennt 3,99 oder 3.99 sauber)
-        let extraNote = null;
-        const priceRegex = /\b(zu|für)?\s*(\d+([.,]\d{1,2})?\s*(€|euro|ct|cent)?|\d+\s*(stk|stück|flaschen|packungen|kg|g|dose|dosen))\b/i;
-        const priceMatch = segmentText.match(priceRegex);
-
-        if (priceMatch && priceMatch[0].trim().length > 0) {
-          extraNote = priceMatch[0].replace(/^(zu|für)\s+/i, '').trim();
-          segmentText = segmentText.replace(priceMatch[0], ' ').trim();
-        }
-
-        // Falls kein Preis-Muster: Erstes Wort = Artikel, Rest = Zusatz/Preis
-        let articleWord = "";
-        if (!extraNote) {
-          const spaceIndex = segmentText.indexOf(' ');
-          if (spaceIndex > -1) {
-            articleWord = segmentText.substring(0, spaceIndex).trim();
-            extraNote = segmentText.substring(spaceIndex + 1).trim();
-          } else {
-            articleWord = segmentText.trim();
-          }
-        } else {
-          articleWord = segmentText.trim();
-        }
-
-        const cleanKey = articleWord.toLowerCase().replace(/[;:!?]/g, '').trim();
-        const marketWords = Object.keys(storeRoutes).map(s => s.toLowerCase());
-        const stopWords = ["bitte", "noch", "etwas", "den", "die", "das", "ein", "eine", "einen", "für", "bei", "mit", "nur", "im", "zu", ...marketWords];
-
-        if (!cleanKey || stopWords.includes(cleanKey)) return;
-
-        const cat = categoryDict[cleanKey] || "Sonstiges";
-        const title = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1);
-
-        // Prüfung: Exakt gleicher Artikel UND identische Beschreibung
-        const existingIdx = items.findIndex(i => 
-          i.title.toLowerCase() === cleanKey && 
-          (i.note || "").trim().toLowerCase() === (extraNote || "").trim().toLowerCase()
-        );
-
-        if (existingIdx > -1) {
-          // Identisch: Reaktivieren, falls erledigt
-          items[existingIdx].done = false;
-          items[existingIdx].completedAt = null;
-          if (detectedStore) items[existingIdx].targetStore = detectedStore;
-        } else {
-          // Neuer Eintrag oder andere Bemerkung
-          items.push({
-            id: 'item_' + Date.now() + Math.random().toString(36).substring(2, 6),
-            title: title,
-            category: cat,
-            done: false,
-            completedAt: null,
-            targetStore: detectedStore,
-            note: extraNote || null
-          });
-        }
-      });
-
-      broadcastState();
-      render();
-    }
-
-    function addFromInput() {
-      const input = document.getElementById('manual-input');
-      if (input.value.trim()) {
-        parseAndAdd(input.value);
-        input.value = "";
-      }
-    }
-
-    // Extrem langsame Zeitlupe (2.2s) mit deutlich sichtbarem Winken 👋
-    function handleCheckWithAnimation(id, checkboxEl) {
-      const rowEl = document.getElementById('row_' + id);
-      if (!rowEl) {
-        toggleItemDirect(id);
-        return;
-      }
-
-      // Großes, auffälliges Winke-Badge mit Text und animierter Hand
-      const badge = document.createElement('div');
-      badge.className = 'waving-badge';
-      badge.innerHTML = `<span class="waving-text">Tschüss!</span><span class="waving-hand-icon">👋</span>`;
-      rowEl.appendChild(badge);
-
-      // Startet die Zeitlupen-Animation
-      rowEl.classList.add('checking-out');
-
-      // Nach 2,2 Sekunden Zeitlupe sauber nach "Erledigt" überführen
-      setTimeout(() => {
-        toggleItemDirect(id);
-      }, 2150);
-    }
-
-    function toggleItemDirect(id) {
-      const item = items.find(i => i.id === id);
-      if (item) {
-        item.done = !item.done;
-        item.completedAt = item.done ? Date.now() : null;
-        broadcastState();
-        render();
-      }
-    }
-
-    function safeDeleteItem(id) {
-      const item = items.find(i => i.id === id);
-      if (!item) return;
-      if (confirm(`Möchtest du "${item.title}" wirklich löschen?`)) {
-        items = items.filter(i => i.id !== id);
-        broadcastState();
-        render();
-      }
-    }
-
-    function render() {
-      const listContainer = document.getElementById('list-container');
-      const doneListContainer = document.getElementById('done-list');
-      const doneCounter = document.getElementById('done-counter');
-      listContainer.innerHTML = "";
-      doneListContainer.innerHTML = "";
-
-      const activeItems = items.filter(i => !i.done);
-      const doneItems = items.filter(i => i.done).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
-
-      doneCounter.textContent = `Erledigte Artikel (${doneItems.length})`;
-
-      if (activeItems.length === 0) {
-        listContainer.innerHTML = "<div style='color: #888;'>Keine aktiven Artikel vorhanden.</div>";
-      } else {
-        const currentOrder = [...(storeRoutes[activeStore] || [])];
-        if (!currentOrder.includes("Sonstiges")) currentOrder.push("Sonstiges");
-
-        const renderedCategorySet = new Set();
-
-        currentOrder.forEach(catName => {
-          const matching = activeItems.filter(i => i.category === catName);
-          if (matching.length === 0) return;
-
-          renderedCategorySet.add(catName);
-          const block = createCategoryBlock(catName, matching);
-          listContainer.appendChild(block);
-        });
-
-        const leftover = activeItems.filter(i => !renderedCategorySet.has(i.category));
-        if (leftover.length > 0) {
-          const block = createCategoryBlock("Sonstiges", leftover);
-          listContainer.appendChild(block);
-        }
-      }
-
-      if (doneItems.length === 0) {
-        doneListContainer.innerHTML = "<div style='padding: 12px; color: #90a4ae; font-size: 0.9rem;'>Keine abgehakten Artikel.</div>";
-      } else {
-        doneItems.forEach(item => {
-          const row = document.createElement('div');
-          row.className = "done-item";
-          let timeString = item.completedAt ? 'um ' + new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-          const storeBadge = item.targetStore ? ` • verfügbar bei ${item.targetStore}` : '';
-          const noteBadge = item.note ? ` • [${item.note}]` : '';
-
-          row.innerHTML = `
-            <input type="checkbox" checked onchange="toggleItemDirect('${item.id}')">
-            <span class="title">${item.title}</span>
-            <span class="done-time">${timeString} (${item.category}${storeBadge}${noteBadge})</span>
-            <button class="btn-action-icon danger" onclick="safeDeleteItem('${item.id}')" title="Artikel löschen">🗑️</button>
-          `;
-          doneListContainer.appendChild(row);
-        });
-      }
-    }
-
-    function createCategoryBlock(catName, itemList) {
-      const block = document.createElement('div');
-      block.className = "cat-block";
-      block.innerHTML = `<div class="cat-header">${catName}</div>`;
-
-      itemList.forEach(item => {
-        const row = document.createElement('div');
-        row.className = "item-row";
-        row.id = "row_" + item.id;
-        
-        const storeBadgeHtml = item.targetStore ? `<span class="badge-store">verfügbar bei ${item.targetStore}</span>` : '';
-        const noteBadgeHtml = item.note ? `<span class="item-extra-note">${item.note}</span>` : '';
-
-        row.innerHTML = `
-          <input type="checkbox" onchange="handleCheckWithAnimation('${item.id}', this)">
-          <div class="item-info">
-            <div class="item-title-line">
-              <span class="item-name">${item.title}</span>
-              ${noteBadgeHtml}
-            </div>
-            ${storeBadgeHtml}
-          </div>
-          <div class="item-actions">
-            <button class="btn-action-icon" title="Bemerkung / Preis korrigieren" onclick="openNoteModal('${item.id}')">📝</button>
-            <button class="btn-action-icon" title="Supermarkt festlegen" onclick="openItemStoreModal('${item.id}')">🏬</button>
-            <button class="btn-action-icon" title="Kategorie / Abteilung ändern" onclick="openCategoryModal('${item.id}')">📁</button>
-            <button class="btn-action-icon danger" title="Artikel sicher löschen" onclick="safeDeleteItem('${item.id}')">🗑️</button>
-          </div>
-        `;
-        block.appendChild(row);
-      });
-      return block;
-    }
-
-    function toggleDoneSection() {
-      const el = document.getElementById('done-list');
-      const arrow = document.getElementById('done-arrow');
-      if (el.style.display === 'none') {
-        el.style.display = 'block';
-        arrow.textContent = '▲';
-      } else {
-        el.style.display = 'none';
-        arrow.textContent = '▼';
-      }
-    }
-
-    /* Notiz- / Bemerkungs-Modal */
-    function openNoteModal(itemId) {
-      editingNoteItemId = itemId;
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-
-      document.getElementById('note-modal-title').textContent = item.title;
-      document.getElementById('note-modal-input').value = item.note || "";
-      document.getElementById('note-modal').style.display = 'flex';
-      setTimeout(() => document.getElementById('note-modal-input').focus(), 50);
-    }
-
-    function closeNoteModal() {
-      document.getElementById('note-modal').style.display = 'none';
-      editingNoteItemId = null;
-    }
-
-    function saveItemNote() {
-      if (!editingNoteItemId) return;
-      const item = items.find(i => i.id === editingNoteItemId);
-      const val = document.getElementById('note-modal-input').value.trim();
-      if (item) {
-        item.note = val ? val : null;
-        broadcastState();
-        render();
-      }
-      closeNoteModal();
-    }
-
-    function clearItemNote() {
-      if (!editingNoteItemId) return;
-      const item = items.find(i => i.id === editingNoteItemId);
-      if (item) {
-        item.note = null;
-        broadcastState();
-        render();
-      }
-      closeNoteModal();
-    }
-
-    /* Supermarkt-Zuweisung Modal */
-    function openItemStoreModal(itemId) {
-      editingStoreItemId = itemId;
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-
-      document.getElementById('item-store-target-title').textContent = item.title;
-      const grid = document.getElementById('item-store-choice-grid');
-      grid.innerHTML = "";
-
-      const btnAll = document.createElement('button');
-      btnAll.className = "btn-cat-choice";
-      btnAll.style.background = "#f5f5f5";
-      btnAll.style.color = "#37474f";
-      btnAll.textContent = "🏢 Überall verfügbar";
-      btnAll.onclick = () => assignItemStore(null);
-      grid.appendChild(btnAll);
-
-      Object.keys(storeRoutes).forEach(storeName => {
-        const btn = document.createElement('button');
-        btn.className = "btn-cat-choice";
-        btn.textContent = `🏬 Nur bei ${storeName}`;
-        btn.onclick = () => assignItemStore(storeName);
-        grid.appendChild(btn);
-      });
-
-      document.getElementById('item-store-modal').style.display = 'flex';
-    }
-
-    function closeItemStoreModal() {
-      document.getElementById('item-store-modal').style.display = 'none';
-      editingStoreItemId = null;
-    }
-
-    function assignItemStore(storeName) {
-      if (!editingStoreItemId) return;
-      const item = items.find(i => i.id === editingStoreItemId);
-      if (item) {
-        item.targetStore = storeName;
-        broadcastState();
-        render();
-      }
-      closeItemStoreModal();
-    }
-
-    /* Kategorie Modal */
-    function openCategoryModal(itemId) {
-      editingItemId = itemId;
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-
-      document.getElementById('change-item-title').textContent = item.title;
-      const grid = document.getElementById('cat-choice-grid');
-      grid.innerHTML = "";
-
-      const currentCats = storeRoutes[activeStore] || [];
-      currentCats.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = "btn-cat-choice";
-        btn.textContent = cat;
-        btn.onclick = () => assignCategory(cat);
-        grid.appendChild(btn);
-      });
-      document.getElementById('category-modal').style.display = 'flex';
-    }
-
-    function closeCategoryModal() {
-      document.getElementById('category-modal').style.display = 'none';
-      editingItemId = null;
-    }
-
-    function assignCategory(newCategory) {
-      if (!editingItemId) return;
-      const item = items.find(i => i.id === editingItemId);
-      if (item) {
-        item.category = newCategory;
-        categoryDict[item.title.toLowerCase()] = newCategory;
-        broadcastState();
-        render();
-      }
-      closeCategoryModal();
-    }
-
-    /* Laufweg Modal */
-    function openRouteModal() {
-      document.getElementById('route-store-title').textContent = activeStore;
-      renderRouteList();
-      document.getElementById('route-modal').style.display = 'flex';
-    }
-
-    function renderRouteList() {
-      const container = document.getElementById('drag-container');
-      container.innerHTML = "";
-      const currentList = storeRoutes[activeStore] || [];
-
-      currentList.forEach((cat, index) => {
-        const li = document.createElement('li');
-        li.className = "drag-item";
-        li.draggable = true;
-        li.dataset.index = index;
-
-        const canModify = cat !== 'Sonstiges';
-        li.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px; flex:1;">
-            <span style="cursor:grab; font-weight:bold; color:#78909c;">☰</span>
-            <span class="cat-label-text" style="font-size:0.95rem;">${cat}</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:#9e9e9e; font-size:0.8rem;">Pos. ${index + 1}</span>
-            ${canModify ? `
-              <button onclick="renameCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1rem; padding:0 2px;" title="Kategorie umbenennen">✏️</button>
-              <button onclick="deleteCategory('${cat}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0 2px; color:#e53935;" title="Kategorie löschen">🗑️</button>
-            ` : `<span style="width:40px;"></span>`}
-          </div>
-        `;
-
-        li.addEventListener('dragstart', handleDragStart);
-        li.addEventListener('dragover', handleDragOver);
-        li.addEventListener('drop', handleDrop);
-        li.addEventListener('dragend', handleDragEnd);
-        container.appendChild(li);
-      });
-    }
-
-    function renameCategory(oldName) {
-      if (oldName === "Sonstiges") return;
-      const newName = prompt(`Neuer Name für die Kategorie "${oldName}":`, oldName);
-      if (!newName || !newName.trim() || newName.trim() === oldName) return;
-
-      const formattedName = newName.trim().charAt(0).toUpperCase() + newName.trim().slice(1);
-
-      Object.keys(storeRoutes).forEach(store => {
-        const idx = storeRoutes[store].indexOf(oldName);
-        if (idx > -1) storeRoutes[store][idx] = formattedName;
-      });
-
-      items.forEach(item => {
-        if (item.category === oldName) item.category = formattedName;
-      });
-
-      Object.keys(categoryDict).forEach(key => {
-        if (categoryDict[key] === oldName) categoryDict[key] = formattedName;
-      });
-
-      broadcastState();
-      renderRouteList();
-      render();
-    }
-
-    function deleteCategory(catName) {
-      if (catName === "Sonstiges") return;
-      if (confirm(`Kategorie "${catName}" für alle Märkte löschen? Alle Artikel landen in "Sonstiges".`)) {
-        Object.keys(storeRoutes).forEach(store => {
-          storeRoutes[store] = storeRoutes[store].filter(c => c !== catName);
-        });
-        items.forEach(i => { if (i.category === catName) i.category = "Sonstiges"; });
-        Object.keys(categoryDict).forEach(k => { if (categoryDict[k] === catName) categoryDict[k] = "Sonstiges"; });
-        broadcastState();
-        renderRouteList();
-        render();
-      }
-    }
-
-    function addNewCategory() {
-      const input = document.getElementById('new-category-input');
-      const val = input.value.trim();
-      if (!val) return;
-      const formatted = val.charAt(0).toUpperCase() + val.slice(1);
-
-      Object.keys(storeRoutes).forEach(store => {
-        if (!storeRoutes[store].includes(formatted)) {
-          const sIdx = storeRoutes[store].indexOf("Sonstiges");
-          if (sIdx > -1) storeRoutes[store].splice(sIdx, 0, formatted);
-          else storeRoutes[store].push(formatted);
-        }
-      });
-      broadcastState();
-      renderRouteList();
-      render();
-      input.value = "";
-    }
-
-    let dragSrcEl = null;
-    function handleDragStart(e) {
-      if (e.target.tagName.toLowerCase() === 'button') { e.preventDefault(); return; }
-      dragSrcEl = this;
-      this.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    }
-    function handleDragOver(e) {
-      if (e.preventDefault) e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      return false;
-    }
-    function handleDrop(e) {
-      if (e.stopPropagation) e.stopPropagation();
-      if (dragSrcEl !== this && dragSrcEl) {
-        const container = document.getElementById('drag-container');
-        const itemsList = Array.from(container.querySelectorAll('.drag-item'));
-        const srcIdx = itemsList.indexOf(dragSrcEl);
-        const targetIdx = itemsList.indexOf(this);
-        if (srcIdx < targetIdx) container.insertBefore(dragSrcEl, this.nextSibling);
-        else container.insertBefore(dragSrcEl, this);
-      }
-      return false;
-    }
-    function handleDragEnd() { if (this.classList) this.classList.remove('dragging'); }
-
-    function saveCustomRoute() {
-      const container = document.getElementById('drag-container');
-      const itemsList = Array.from(container.querySelectorAll('.drag-item'));
-      storeRoutes[activeStore] = itemsList.map(li => li.querySelector('.cat-label-text').textContent.trim());
-      broadcastState();
-      render();
-      document.getElementById('route-modal').style.display = 'none';
-    }
-
-    function openSyncModal() {
-      document.getElementById('sync-code-input').value = syncCode;
-      document.getElementById('sync-modal').style.display = 'flex';
-    }
-    function closeSyncModal() { document.getElementById('sync-modal').style.display = 'none'; }
-    function saveSyncCode() {
-      const val = document.getElementById('sync-code-input').value.trim();
-      if (val) {
-        syncCode = val;
-        localStorage.setItem('local_sync_code', syncCode);
-        location.reload();
-      }
-    }
-
-    function shareList() {
-      const shareUrl = window.location.origin + window.location.pathname + '?sync=' + syncCode;
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        const status = document.getElementById('mic-status');
-        status.textContent = "✅ Sync-Link in die Zwischenablage kopiert!";
-        setTimeout(() => { status.textContent = "Bereit für Eingaben (funktioniert auch offline)."; }, 4000);
-      }).catch(() => {
-        prompt("Kopiere diesen Link:", shareUrl);
-      });
-    }
-
-    /* Spracherkennung */
-    let recognition = null;
-    let keepRecording = false;
-
-    function toggleVoice() {
-      if (keepRecording) stopVoice();
-      else startVoice();
-    }
-
-    function startVoice() {
-      const status = document.getElementById('mic-status');
-      const micBtn = document.getElementById('btn-mic');
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-      if (!SpeechRec) {
-        status.textContent = "Spracheingabe benötigt Chrome/Safari.";
-        return;
-      }
-
-      keepRecording = true;
-      micBtn.classList.add('recording');
-      micBtn.textContent = "⏹";
-      status.textContent = "Aufnahme läuft... (z. B. 'Packe Nudeln zu 1,99€ in die Einkaufsliste')";
-
-      try {
-        recognition = new SpeechRec();
-        recognition.lang = 'de-DE';
-        recognition.interimResults = false;
-
-        recognition.onresult = (evt) => {
-          const text = evt.results[0][0].transcript;
-          status.textContent = `Erkannt: "${text}"`;
-          parseAndAdd(text);
-        };
-
-        recognition.onend = () => {
-          if (keepRecording) {
-            try { recognition.start(); } catch(e) {}
-          } else {
-            micBtn.classList.remove('recording');
-            micBtn.textContent = "🎙️";
-          }
-        };
-
-        recognition.onerror = () => {
-          if (!keepRecording) {
-            micBtn.classList.remove('recording');
-            micBtn.textContent = "🎙️";
-          }
-        };
-
-        recognition.start();
-      } catch(e) {
-        status.textContent = "Fehler beim Start.";
-      }
-    }
-
-    function stopVoice() {
-      keepRecording = false;
-      const status = document.getElementById('mic-status');
-      const micBtn = document.getElementById('btn-mic');
-      micBtn.classList.remove('recording');
-      micBtn.textContent = "🎙️";
-      status.textContent = "Bereit für Eingaben (funktioniert auch offline).";
-      if (recognition) {
-        try { recognition.stop(); } catch(e) {}
-      }
-    }
-
-    // Startet die App vollständig lokal
-    initData();
-  </script>
-</body>
-</html>
+<input id="import-file" type="file" accept="application/json" hidden><script src="./mqtt.min.js" defer></script><script src="./app.js" defer></script></body></html>
