@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.1.0';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.2.0';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -31,11 +31,31 @@ function persist(){try{db.rooms[syncCode]=records;db.room=syncCode;db.activeStor
 function stamp(){clock=Math.max(Date.now(),clock+1);return [clock,client]}
 function newer(a,b){return !b||a.v[0]>b.v[0]||(a.v[0]===b.v[0]&&a.v[1]>b.v[1])}
 function put(id,value){records[id]={v:stamp(),data:clone(value)}}
-function materialize(){items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
+// Identity is article + description. Market, spelling case and extra whitespace do not create variants.
+function identityText(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('de')}
+function itemKey(item){return JSON.stringify([identityText(item.title),identityText(item.note)])}
+function deduplicateRecords(){
+ const groups=new Map();
+ for(const [id,r]of Object.entries(records)){
+  clock=Math.max(clock,r.v[0]);if(!id.startsWith('i:')||!r.data)continue;
+  const k=itemKey(r.data);if(!groups.has(k))groups.set(k,[]);groups.get(k).push([id,r]);
+ }
+ let changed=false;
+ for(const group of groups.values())if(group.length>1){
+  group.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  const canonical=group[0][0];let latest=group[0][1];
+  for(const [,r]of group)if(newer(r,latest))latest=r;
+  put(canonical,{...clone(latest.data),id:canonical.slice(2)});
+  for(const [id]of group)if(id!==canonical){put(id,null);pending.delete(id)}
+  changed=true;
+ }
+ return changed;
+}
+function materialize(){deduplicateRecords();items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
 function validText(s,n=200){return typeof s==='string'&&s.length<=n}
 function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean';if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
 function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();render()}return changed}
-function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(persist())sendState()}
+function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();if(persist())sendState()}
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const unb64=s=>Uint8Array.from(atob(s),x=>x.charCodeAt(0));
@@ -119,7 +139,7 @@ function renderStoreButtons(){const box=$('store-buttons-container');box.replace
 function button(text,fn,cls='btn-action-icon',title=text){const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=text;b.onclick=fn;b.title=title;b.setAttribute('aria-label',title);return b}
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
-function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true))}
+function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions()}
 function itemRow(i,done=false){const row=text('div','',done?'done-item':'item-row');row.id='row_'+i.id;const check=document.createElement('input');check.type='checkbox';check.checked=done||pending.has(i.id);check.setAttribute('aria-label',i.title+(done?' wieder auf die Liste':' erledigen'));check.onchange=()=>done?toggleItemDirect(i.id):handleCheckWithAnimation(i.id);row.append(check);const info=text('div','','item-info');info.append(text('span',i.title,done?'title':'item-name'));if(i.note)info.append(text('span',i.note,'item-extra-note'));if(i.targetStore)info.append(text('span','Bei '+i.targetStore,'badge-store'));info.append(button('Bearbeiten',()=>openEditor(i),'btn-action-icon secondary'));row.append(info);const actions=text('div','','item-actions');actions.append(button('✎',()=>openEditor(i),'btn-action-icon','Artikel bearbeiten'),button('×',()=>safeDeleteItem(i.id),'btn-action-icon danger','Artikel löschen'));row.append(actions);if(pending.has(i.id))decorate(row);return row}
 function decorate(row){row.classList.add('checking-out');const badge=text('div','','waving-badge');badge.append(text('span','Tschüss!','waving-text'),text('span','😊 👋','waving-hand-icon'));row.append(badge)}
 function handleCheckWithAnimation(id){if(pending.has(id))return;const i=items.find(i=>i.id===id);if(!i)return;i.done=true;i.completedAt=Date.now();broadcastState();pending.set(id,true);decorate($('row_'+id));setTimeout(()=>{pending.delete(id);const r=records['i:'+id];if(r?.data)Object.assign(i,r.data);materialize();render()},matchMedia('(prefers-reduced-motion: reduce)').matches?0:2500)}
@@ -138,8 +158,40 @@ const quantity=name.match(/^(\d+(?:[.,]\d+)?\s*(?:kg|g|liter|l|stück|packungen?
 const known=Object.keys(categoryDict).sort((a,b)=>b.length-a.length).find(k=>norm(name)===k||norm(name).startsWith(k+' '));if(known&&norm(name)!==known){note=[name.slice(known.length).trim(),note].filter(Boolean).join(' · ');name=name.slice(0,known.length)}
 // Unbekannte mehrteilige Artikelnamen bleiben vollständig erhalten.
 name=name.trim();if(!name||name.length>200||/^(noch|bitte|und|für|zu)$/i.test(name))continue;out.push({title:name.charAt(0).toUpperCase()+name.slice(1),note:note.slice(0,200),category:categoryDict[norm(name)]||'Sonstiges',targetStore})}return out}
-function parseAndAdd(raw){const parsed=parseText(raw);for(const p of parsed){const existing=items.find(i=>norm(i.title)===norm(p.title)&&norm(i.note||'')===norm(p.note)&&(!p.targetStore||p.targetStore===i.targetStore));if(existing){pending.delete(existing.id);existing.done=false;existing.completedAt=null}else items.push({...p,id:uuid(),done:false,completedAt:null})}if(parsed.length){broadcastState();render();status(parsed.length+' Artikel verarbeitet · lokal gespeichert.')}}
-function addFromInput(){const value=$('manual-input').value;if(value.trim()){parseAndAdd(value);$('manual-input').value='';$('manual-input').focus()}}
+function parseAndAdd(raw){const parsed=parseText(raw);for(const p of parsed){
+ const existing=items.find(i=>itemKey(i)===itemKey(p));
+ if(existing){pending.delete(existing.id);existing.done=false;existing.completedAt=null;if(p.targetStore)existing.targetStore=p.targetStore}
+ else items.push({...p,id:uuid(),done:false,completedAt:null});
+ }if(parsed.length){broadcastState();render();status(parsed.length+' Artikel verarbeitet · lokal gespeichert.')}}
+function completedSuggestions(query){
+ const q=identityText(query);if(!q)return [];
+ return items.filter(i=>i.done&&(identityText(i.title).includes(q)||identityText(i.title+' '+(i.note||'')).includes(q)))
+ .sort((a,b)=>Number(identityText(b.title).startsWith(q))-Number(identityText(a.title).startsWith(q))||(b.completedAt||0)-(a.completedAt||0)||a.title.localeCompare(b.title,'de')).slice(0,6);
+}
+function renderSuggestions(){
+ const box=$('suggestions');if(!box)return;box.replaceChildren();
+ const suggestions=completedSuggestions($('manual-input').value);box.hidden=!suggestions.length;
+ $('manual-input').setAttribute('aria-expanded',String(suggestions.length>0));
+ if(!suggestions.length)return;
+ box.append(text('div','Schon gekauft – zum Übernehmen auswählen','suggestions-title'));
+ for(const i of suggestions){
+  const label=i.title+(i.note?' · '+i.note:'');
+  const b=button(label,()=>restoreCompleted(i.id),'suggestion','Wieder hinzufügen: '+label);
+  b.onkeydown=e=>{const buttons=[...box.querySelectorAll('button')],at=buttons.indexOf(b);
+   if(e.key==='ArrowDown'){e.preventDefault();buttons[(at+1)%buttons.length].focus()}
+   if(e.key==='ArrowUp'){e.preventDefault();if(at===0)$('manual-input').focus();else buttons[at-1].focus()}
+   if(e.key==='Escape'){e.preventDefault();box.hidden=true;$('manual-input').setAttribute('aria-expanded','false');$('manual-input').focus()}
+  };box.append(b);
+ }
+}
+function restoreCompleted(id){const i=items.find(i=>i.id===id);if(!i)return;pending.delete(id);i.done=false;i.completedAt=null;broadcastState();$('manual-input').value='';render();$('manual-input').focus();status(i.title+' wieder auf die Einkaufsliste gesetzt.')}
+function handleInputKey(e){
+ if(e.isComposing||e.keyCode===229)return;
+ if(e.key==='Enter'){e.preventDefault();addFromInput()}
+ if(e.key==='ArrowDown'){const first=$('suggestions').querySelector('button');if(first&&!$('suggestions').hidden){e.preventDefault();first.focus()}}
+ if(e.key==='Escape'){$('suggestions').hidden=true;$('manual-input').setAttribute('aria-expanded','false')}
+}
+function addFromInput(){const value=$('manual-input').value;if(value.trim()){parseAndAdd(value);$('manual-input').value='';renderSuggestions();$('manual-input').focus()}}
 function openEditor(i){editingItemId=i.id;editingNoteItemId=i.id;editingStoreItemId=i.id;const modal=$('note-modal').querySelector('.modal');modal.replaceChildren();modal.append(text('h2','Artikel bearbeiten'));const form=document.createElement('form');const fields={};for(const [label,id,value]of [['Artikel','title',i.title],['Bemerkung / Preis','note',i.note||'']]){const l=text('label',label);const input=document.createElement('input');input.value=value;input.maxLength=200;input.required=id==='title';input.style='width:100%;padding:12px;margin:6px 0 16px';l.append(input);form.append(l);fields[id]=input}for(const [label,id,values,value]of [['Kategorie','category',[...new Set(Object.values(storeRoutes).flat())],i.category],['Supermarkt','targetStore',['',...Object.keys(storeRoutes)],i.targetStore||'']]){const l=text('label',label);const select=document.createElement('select');select.style='width:100%;padding:12px;margin:6px 0 16px';for(const v of [...new Set([...values,value])]){const option=text('option',v||'In jedem Markt');option.value=v;select.append(option)}select.value=value;fields[id]=select;l.append(select);form.append(l)}const save=button('Speichern',()=>{},'btn-modal');save.type='submit';form.append(save,button('Abbrechen',closeNoteModal,'btn-modal'));form.onsubmit=e=>{e.preventDefault();const current=items.find(x=>x.id===i.id);if(!current){closeNoteModal();return}for(const [k,input]of Object.entries(fields))current[k]=input.value.trim();categoryDict[norm(current.title)]=current.category;broadcastState();render();closeNoteModal()};modal.append(form);$('note-modal').style.display='flex';fields.title.focus()}
 function closeNoteModal(){$('note-modal').style.display='none'}
 function toggleDropdownMenu(e){e.stopPropagation();$('dropdown-menu').classList.toggle('show')}
@@ -177,4 +229,5 @@ async function checkUpdate(){if(!navigator.onLine){status('Du bist offline. Upda
 function applyUpdate(){waitingWorker=reg?.waiting||waitingWorker;if(!waitingWorker||!persist())return;stopVoice();sessionStorage.setItem('einkauf-updating','yes');waitingWorker.postMessage({type:'ACTIVATE'})}
 for(const overlay of document.querySelectorAll('.modal-overlay')){overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none'})}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of document.querySelectorAll('.modal-overlay'))o.style.display='none';$('dropdown-menu').classList.remove('show')}if(e.key==='Tab'){const modal=[...document.querySelectorAll('.modal-overlay')].find(o=>o.style.display==='flex');if(modal){const focus=[...modal.querySelectorAll('button,input,select')].filter(x=>!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus()}}}});
+$('manual-input').addEventListener('input',renderSuggestions);
 init();

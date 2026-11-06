@@ -43,3 +43,10 @@ Syntax, Artikelerfassung, Dezimalkomma, Mengen, Varianten, Reaktivierung, Marktw
 - Updates bleiben zustimmungspflichtig. Es ist keine Neuinstallation erforderlich.
 
 Regressionstests ohne Netzwerk: `node tests/test-sync.cjs` und `node tests/test-transport.cjs`. Diese verwenden ausschließlich getrennte Testspeicher und künstliche Artikel.
+
+## Version 3.2.0 – Dubletten und Eingabevorschläge
+Artikelname und Beschreibung/Zusatz bilden zusammen einen eindeutigen Eintrag. Groß-/Kleinschreibung, zusätzliche Leerzeichen und ein anderer Zielmarkt erzeugen keine Dublette. Unterschiedliche Zusätze bleiben getrennt. Bereits vorhandene sowie beim Offline-Abgleich entstandene Dubletten werden zusammengeführt; der zuletzt bearbeitete Zustand bleibt maßgeblich. Gelöschte Dubletten bleiben für den Abgleich als Löschmarkierung gespeichert, damit alte Geräte sie nicht einfach zurückbringen.
+
+Beim Tippen erscheinen bis zu sechs passende erledigte Artikel. Antippen oder Pfeil nach unten und Enter setzt den vorhandenen Artikel mit seinem Zusatz wieder auf die Liste. Aktive Artikel werden nicht als erledigte Vorschläge angezeigt. Die Vorschläge funktionieren lokal und offline.
+
+Zusätzlicher Test: `node tests/test-dedup.cjs`. Er prüft auch getrennte Offline-Geräte, Bearbeitungskollisionen und Wiederaufnahme erledigter Varianten.
