@@ -1,6 +1,6 @@
-const VERSION='einkauf-v3-20261106-github-1';
+const VERSION='einkauf-v3-20261106-github-2';
 const FILES=['./','./index.html','./app.js','./mqtt.min.js','./manifest.webmanifest','./icon.svg'];
-self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(VERSION);await cache.addAll(FILES)})()));
+self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(VERSION);await cache.addAll(FILES.map(path=>new Request(new URL(path,self.location).href,{cache:'reload'})))})()));
 // Neue Versionen bleiben in waiting, bis der Nutzer ausdrücklich zustimmt.
 self.addEventListener('message',event=>{if(event.data?.type==='ACTIVATE')self.skipWaiting()});
 self.addEventListener('activate',event=>event.waitUntil((async()=>{await self.clients.claim();const clients=await self.clients.matchAll();if(clients.length<=1){for(const key of await caches.keys())if(key.startsWith('einkauf-v3-')&&key!==VERSION)await caches.delete(key)}})()));

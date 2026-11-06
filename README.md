@@ -21,7 +21,7 @@ Alle Dateiverweise sind relativ. Damit funktioniert die App auch unter einer Pro
 Bei jeder neuen Veröffentlichung mit geänderten App-Dateien in sw.js den Wert VERSION auf einen neuen eindeutigen Wert ändern. Dann alle geänderten Dateien zusammen hochladen. Der Browser lädt die neue Version im Hintergrund. Die App fragt, bevor diese aktiviert wird. „Später“ lässt die bisherige Version aktiv. Einkaufsliste und Laufwege werden durch ein App-Update nicht gelöscht.
 
 ## Geräte verknüpfen
-Auf dem ersten Gerät den geheimen Verknüpfungslink über das Kettensymbol kopieren. Den Link auf dem zweiten Gerät öffnen und dem Wechsel zur gemeinsamen Liste zustimmen. Auf GitHub Pages gibt es keine ChatGPT-Anmeldung. Die Veröffentlichung dieser Dateien enthält keine Einkaufsdaten. Die Liste liegt im jeweiligen Browser; übertragen wird sie verschlüsselt über den öffentlichen HiveMQ-Testbroker. Wer den geheimen Link besitzt, kann die gemeinsame Liste lesen und ändern. Den Link nur vertraut teilen.
+Auf dem ersten Gerät den geheimen Verknüpfungslink über das Kettensymbol kopieren. Den Link auf dem zweiten Gerät öffnen und dem Wechsel zur gemeinsamen Liste zustimmen. Auf GitHub Pages gibt es keine ChatGPT-Anmeldung. Die Veröffentlichung dieser Dateien enthält keine Einkaufsdaten. Die Liste liegt im jeweiligen Browser; übertragen wird sie verschlüsselt über die öffentlichen HiveMQ- und EMQX-Testbroker. Wer den geheimen Link besitzt, kann die gemeinsame Liste lesen und ändern. Den Link nur vertraut teilen.
 
 Internet wird zum Geräteabgleich benötigt. Offline bearbeitete Artikel werden nach Wiederverbindung zusammengeführt. Bei gleichzeitiger Änderung desselben Artikels gewinnt die neuere Änderungsmarke. Laufwege werden je Markt als Einheit abgeglichen. Der öffentliche Testbroker bietet keine garantierte Verfügbarkeit oder dauerhafte Datensicherung; die Export-Funktion dient als zusätzliche Sicherung.
 
@@ -33,3 +33,13 @@ Beim Wechsel von der privaten Testadresse zur GitHub-Adresse werden Browserdaten
 
 ## Prüfstand
 Syntax, Artikelerfassung, Dezimalkomma, Mengen, Varianten, Reaktivierung, Marktwechsel, Zusammenführung und Löschkonflikte wurden automatisiert geprüft. Offline-Cache und ausdrückliche Update-Aktivierung wurden mit einem simulierten Service-Worker-Lauf geprüft. Die Oberfläche wurde im Browser bedient. Echter Offline-Neustart, Mikrofon und Geräteabgleich zwischen zwei physischen Geräten müssen auf den Zielgeräten geprüft werden.
+
+## Version 3.1.0 – Geräteabgleich
+- Frühere lokale Verknüpfungscodes werden einmalig wiederhergestellt; vorhandene Artikel bleiben erhalten. Beide Geräte müssen aktualisiert werden.
+- Empfangene Artikel und Laufwege werden als getrennte Kopien bearbeitet, damit jede Änderung eine neue Synchronisationsversion erhält.
+- Zwei verschlüsselte Serververbindungen, getrennte gespeicherte Zustände je Gerät und erneuter Abgleich bei Rückkehr in die App verbessern den Wiederanschluss.
+- Die Statuszeile unterscheidet Serververbindung und ein tatsächlich antwortendes zweites Gerät. Eine kurze Listenkennung hilft beim Vergleich.
+- Unter Optionen → Geräte verknüpfen kann der vollständige Code direkt in der installierten App eingegeben werden, falls ein Link im separaten Handy-Browser öffnet.
+- Updates bleiben zustimmungspflichtig. Es ist keine Neuinstallation erforderlich.
+
+Regressionstests ohne Netzwerk: `node tests/test-sync.cjs` und `node tests/test-transport.cjs`. Diese verwenden ausschließlich getrennte Testspeicher und künstliche Artikel.

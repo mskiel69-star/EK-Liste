@@ -464,10 +464,10 @@
 
   <div class="modal-overlay" id="sync-modal">
     <div class="modal">
-      <h2 style="margin-top: 0;">Live-Synchronisation</h2>
+      <h2 style="margin-top: 0;">Handys verbinden</h2><p id="sync-diagnostic" role="status"></p><label for="sync-current-code">Code dieser Liste (auf beiden Handys identisch):</label><textarea id="sync-current-code" readonly style="width:100%;padding:10px;margin:8px 0" rows="2"></textarea><button class="btn-modal" onclick="shareList()">Verknüpfungslink kopieren</button><p>Falls ein Link nur im Browser öffnet: In der installierten App auf dem zweiten Handy den Code hier unten einfügen und auf Verbinden tippen.</p>
       <p style="font-size: 0.85rem; color: #546e7a;">Verknüpfte Geräte gleichen Änderungen bei Internetverbindung ab. Der geheime Link erlaubt den Zugriff auf die Liste. Nur vertraut teilen. Verknüpfte Personen öffnen diesen Link auf ihrem eigenen Gerät.</p>
       <div style="display: flex; gap: 6px; margin: 10px 0;">
-        <input type="text" id="sync-code-input" style="flex:1; padding:10px; border:1px solid #cfd8dc; border-radius:6px; font-weight:bold;">
+        <input aria-label="Code oder Link vom ersten Handy" placeholder="Code oder Link vom ersten Handy" type="text" id="sync-code-input" style="flex:1; padding:10px; border:1px solid #cfd8dc; border-radius:6px; font-weight:bold;">
         <button class="btn-add-compact" style="width: auto; padding: 0 14px; font-size: 0.9rem;" onclick="saveSyncCode()">Verbinden</button>
       </div>
       <button class="btn-modal" style="background:#90a4ae;" onclick="closeSyncModal()">Schließen</button>

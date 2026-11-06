@@ -22,7 +22,8 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.1.0';
+let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
 function status(t){$('mic-status').textContent=t}
@@ -30,28 +31,89 @@ function persist(){try{db.rooms[syncCode]=records;db.room=syncCode;db.activeStor
 function stamp(){clock=Math.max(Date.now(),clock+1);return [clock,client]}
 function newer(a,b){return !b||a.v[0]>b.v[0]||(a.v[0]===b.v[0]&&a.v[1]>b.v[1])}
 function put(id,value){records[id]={v:stamp(),data:clone(value)}}
-function materialize(){items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(r.data);if(id.startsWith('s:'))storeRoutes[id.slice(2)]=r.data;if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
+function materialize(){items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
 function validText(s,n=200){return typeof s==='string'&&s.length<=n}
 function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean';if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
-function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=r;clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();render()}return changed}
-function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);if(persist())sendState()}
+function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();render()}return changed}
+function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(persist())sendState()}
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const unb64=s=>Uint8Array.from(atob(s),x=>x.charCodeAt(0));
 async function derive(){const digest=await crypto.subtle.digest('SHA-256',enc.encode(syncCode));key=await crypto.subtle.importKey('raw',digest,'AES-GCM',false,['encrypt','decrypt']);topic='maik-einkauf-v3/'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode('topic:'+syncCode))),x=>x.toString(16).padStart(2,'0')).join('')}
-let sending=false,again=false;
-async function sendState(){if(!mqttClient?.connected||!syncReady||!key)return;if(sending){again=true;return}sending=true;const g=generation;try{const iv=crypto.getRandomValues(new Uint8Array(12));const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify({sender:client,records})));if(g===generation&&mqttClient?.connected)mqttClient.publish(topic,JSON.stringify({iv:b64(iv),body:b64(encrypted)}),{qos:1,retain:true})}catch(e){status('Abgleich fehlgeschlagen. Deine Änderungen bleiben lokal gespeichert.')}finally{sending=false;if(again){again=false;sendState()}}}
-function networkStatus(){const online=mqttClient?.connected&&syncReady;$('live-dot').classList.toggle('online',!!online);$('app-state').textContent=online?'● Geräte verbunden · Änderungen werden verschlüsselt abgeglichen.':navigator.onLine?'● Auf diesem Gerät gespeichert · Geräteabgleich verbindet …':'● Offline · Deine Liste bleibt auf diesem Gerät verfügbar.'}
-async function connect(){const g=++generation;syncReady=false;if(mqttClient)mqttClient.end(true);mqttClient=null;networkStatus();if(!navigator.onLine||typeof mqtt==='undefined')return;if(!crypto.subtle){$('app-state').textContent='Lokal gespeichert · Geräteabgleich und Offline-Start benötigen HTTPS.';return}await derive();if(g!==generation)return;const roomKey=key,roomTopic=topic;let handshake;
-const c=mqtt.connect('wss://broker.hivemq.com:8884/mqtt',{clientId:'einkauf_'+client,clean:true,connectTimeout:8000,reconnectPeriod:5000});mqttClient=c;
-c.on('connect',()=>{syncReady=false;c.subscribe(roomTopic,{qos:1},err=>{if(err)return;clearTimeout(handshake);handshake=setTimeout(()=>{if(g===generation){syncReady=true;networkStatus();sendState()}},1400)})});
-c.on('message',async(t,msg)=>{if(g!==generation||msg.length>2000000)return;try{const p=JSON.parse(msg.toString());const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(p.iv)},roomKey,unb64(p.body));if(g!==generation)return;const data=JSON.parse(dec.decode(plain));if(data.sender===client)return;const changed=merge(data.records);if(changed&&syncReady)sendState()}catch(e){status('Eine ungültige Sync-Nachricht wurde ignoriert.')}});
-for(const ev of ['offline','close','error'])c.on(ev,()=>{clearTimeout(handshake);syncReady=false;networkStatus()})}
+// Independent retained snapshots avoid overwriting an offline device's changes at reconnect.
+const syncConnections=[], peerSeen=new Map();
+let sending=false,again=false,syncRevision=0,pendingSync=true,syncTimer=null,legacyMigration=null;
+function listLabel(){return syncCode.slice(0,6)+'…'+syncCode.slice(-4)}
+function networkStatus(){
+ const now=Date.now(),ready=syncConnections.filter(c=>c.connected&&c.syncReady),peers=[...peerSeen.values()].filter(t=>now-t<75000).length;
+ $('live-dot').classList.toggle('online',ready.length>0);
+ $('live-dot').title=ready.length?'Synchronisationsserver erreichbar':'Nur auf diesem Gerät gespeichert';
+ let message=!navigator.onLine?'Offline · Änderungen bleiben auf diesem Gerät gespeichert.':ready.length?(peers?'Zweites Gerät auf dieser Liste bestätigt':'Server verbunden · Noch kein zweites Gerät bestätigt')+(pendingSync?' · Übertragung ausstehend.':' · An Server übertragen.'):'Server nicht erreichbar oder verbindet · Änderungen bleiben lokal gespeichert.';
+ $('app-state').textContent='v'+APP_VERSION+' · Liste '+listLabel()+' · '+message;
+ const diagnostic=$('sync-diagnostic');if(diagnostic)diagnostic.textContent=$('app-state').textContent;
+}
+async function restoreLegacyPairing(){
+ if(legacyMigration)return legacyMigration;
+ legacyMigration=(async()=>{
+  if(db.legacySyncMigrated)return;
+  let legacy;try{legacy=localStorage.getItem('local_sync_code')}catch(e){}
+  if(!legacy||!crypto.subtle){db.legacySyncMigrated=true;persist();return}
+  const digest=await crypto.subtle.digest('SHA-256',enc.encode('einkauf-v3-legacy:'+legacy));
+  if(db.legacySyncMigrated)return;
+  const restored=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
+  persist();const previous=records,next=clone(db.rooms[restored]||{});
+  for(const [id,r]of Object.entries(previous))if(newer(r,next[id]))next[id]=clone(r);
+  syncCode=restored;records=next;db.legacySyncMigrated=true;materialize();persist();renderStoreButtons();render();
+  status('Frühere Geräteverknüpfung wiederhergestellt. Bitte beide Handys auf Version '+APP_VERSION+' aktualisieren.');
+ })();return legacyMigration;
+}
+async function encryptedPacket(data){const iv=crypto.getRandomValues(new Uint8Array(12));const bytes=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(data)));return JSON.stringify({iv:b64(iv),body:b64(bytes)})}
+async function sendState(){
+ const targets=syncConnections.filter(c=>c.connected&&c.syncReady);if(!targets.length||!key)return;
+ if(sending){again=true;return}sending=true;const g=generation,revision=syncRevision;
+ try{const payload=await encryptedPacket({kind:'state',sender:client,device:deviceId,sentAt:Date.now(),records});
+  if(g!==generation)return;
+  for(const c of targets)if(c.connected)c.publish(topic+'/state/'+deviceId,payload,{qos:1,retain:true},err=>{if(g!==generation)return;if(!err&&revision===syncRevision)pendingSync=false;networkStatus()});
+ }catch(e){pendingSync=true;status('Abgleich fehlgeschlagen. Änderungen bleiben lokal gespeichert.')}
+ finally{sending=false;if(again){again=false;sendState()}}
+}
+async function requestState(){if(!key)return;const g=generation;try{const payload=await encryptedPacket({kind:'hello',sender:client,device:deviceId,sentAt:Date.now()});if(g!==generation)return;for(const c of syncConnections)if(c.connected&&c.syncReady)c.publish(topic+'/hello',payload,{qos:1,retain:false})}catch(e){}}
+async function connect(){
+ const g=++generation;syncReady=false;clearInterval(syncTimer);for(const c of syncConnections.splice(0))c.end(true);mqttClient=null;peerSeen.clear();
+ await restoreLegacyPairing();if(g!==generation)return;networkStatus();
+ if(!navigator.onLine||typeof mqtt==='undefined')return;
+ if(!crypto.subtle){$('app-state').textContent='Lokal gespeichert · Geräteabgleich und Offline-Start benötigen HTTPS.';return}
+ await derive();if(g!==generation)return;const roomKey=key,roomTopic=topic;
+ // Keep both transports open, so devices on different networks can share an available broker.
+ const brokers=['wss://broker.hivemq.com:8884/mqtt','wss://broker.emqx.io:8084/mqtt'];
+ for(const [index,url]of brokers.entries()){
+  const c=mqtt.connect(url,{clientId:'ek_'+client.replace(/-/g,'').slice(0,16)+index,clean:true,forceNativeWebSocket:true,connectTimeout:10000,reconnectPeriod:4000,keepalive:25,resubscribe:false});
+  c.syncReady=false;syncConnections.push(c);if(!mqttClient)mqttClient=c;
+  c.on('connect',()=>{if(g!==generation)return;c.syncReady=false;
+   c.subscribe([roomTopic,roomTopic+'/state/+',roomTopic+'/hello'],{qos:1},(err,granted)=>{
+    if(g!==generation)return;if(err||granted?.some(x=>x.qos===128)){c.syncReady=false;networkStatus();return}
+    c.syncReady=true;syncReady=true;networkStatus();requestState();sendState();
+   });
+  });
+  c.on('message',async(t,msg,packet)=>{
+   if(g!==generation||msg.length>2000000)return;
+   try{const p=JSON.parse(msg.toString());const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(p.iv)},roomKey,unb64(p.body));if(g!==generation)return;
+    const data=JSON.parse(dec.decode(plain));if(data.sender===client)return;
+    if(!packet?.retain&&typeof data.device==='string'&&data.device!==deviceId)peerSeen.set(data.device,Date.now());
+    if(data.kind==='hello'){sendState();networkStatus();return}
+    const changed=merge(data.records);if(changed)sendState();networkStatus();
+   }catch(e){status('Eine ungültige Sync-Nachricht wurde ignoriert.')}
+  });
+  for(const ev of ['offline','close','error'])c.on(ev,()=>{if(g!==generation)return;c.syncReady=false;networkStatus()});
+ }
+ syncTimer=setInterval(()=>{requestState();sendState();networkStatus()},25000);
+}
+function resumeApp(){if(document.hidden)return;if(reg)reg.update().catch(()=>{});if(!syncConnections.some(c=>c.connected&&c.syncReady))connect();else{requestState();sendState()}}
 function init(){try{const saved=JSON.parse(localStorage.getItem(STORAGE));if(saved?.schema===3&&saved.rooms)db=saved}catch(e){status('Gespeicherte Daten konnten nicht geladen werden. Bitte Sicherung importieren.')}
 syncCode=db.room||uuid()+uuid();activeStore=db.activeStore||'Aldi';records=db.rooms[syncCode]||{};
 if(!db.room){try{const legacy=JSON.parse(localStorage.getItem('local_einkaufsliste')||'[]');for(const i of legacy)if(i&&typeof i.title==='string')put('i:'+i.id,{...i,note:i.note||'',done:!!i.done});const routes=JSON.parse(localStorage.getItem('local_store_routes')||'null');if(routes)for(const [s,r]of Object.entries(routes))if(Array.isArray(r))put('s:'+s,r);const dict=JSON.parse(localStorage.getItem('local_category_dict')||'null');if(dict&&typeof dict==='object')for(const [word,cat]of Object.entries(dict))if(validText(word,200)&&validText(cat,80))put('d:'+word,cat);const previousStore=localStorage.getItem('local_einkaufsliste_store');if(previousStore)activeStore=previousStore}catch(e){}}
 materialize();persist();renderStoreButtons();render();connect();setupPWA();const invite=new URLSearchParams(location.hash.slice(1)).get('join');if(invite){history.replaceState(null,'',location.pathname);setTimeout(()=>joinRoom(invite),200)}
-window.addEventListener('online',connect);window.addEventListener('offline',networkStatus);window.addEventListener('storage',e=>{if(e.key===STORAGE&&e.newValue){try{merge(JSON.parse(e.newValue).rooms[syncCode])}catch(e){}}});}
+window.addEventListener('online',connect);window.addEventListener('pageshow',resumeApp);document.addEventListener('visibilitychange',resumeApp);window.addEventListener('offline',networkStatus);window.addEventListener('storage',e=>{if(e.key===STORAGE&&e.newValue){try{merge(JSON.parse(e.newValue).rooms[syncCode])}catch(e){}}});}
 function switchStore(s){if(storeRoutes[s]){activeStore=s;persist();renderStoreButtons();render();status('Laufweg: '+s)}}
 function renderStoreButtons(){const box=$('store-buttons-container');box.replaceChildren();for(const s of Object.keys(storeRoutes)){const b=button(s,()=>switchStore(s),'btn-store'+(s===activeStore?' active':''));b.setAttribute('aria-pressed',s===activeStore);box.append(b)}}
 function button(text,fn,cls='btn-action-icon',title=text){const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=text;b.onclick=fn;b.title=title;b.setAttribute('aria-label',title);return b}
@@ -97,11 +159,11 @@ function renderStoreManagerList(){$('store-list-container').replaceChildren();fo
 function renameStore(old){const name=prompt('Neuer Marktname:',old)?.trim();if(!name||name===old)return;if(name.length>80||Object.keys(storeRoutes).some(s=>norm(s)===norm(name))){alert('Marktname existiert bereits oder ist zu lang.');return}storeRoutes[name]=storeRoutes[old];delete storeRoutes[old];for(const i of items)if(i.targetStore===old)i.targetStore=name;if(activeStore===old)activeStore=name;broadcastState();renderStoreManagerList();renderStoreButtons();render()}
 function addNewStore(){const name=$('new-store-input').value.trim();if(!name||name.length>80)return;if(Object.keys(storeRoutes).some(s=>norm(s)===norm(name))){alert('Diesen Markt gibt es bereits.');return}storeRoutes[name]=[...storeRoutes[activeStore]];activeStore=name;$('new-store-input').value='';broadcastState();renderStoreManagerList();renderStoreButtons();render()}
 function deleteStore(s){if(Object.keys(storeRoutes).length===1){alert('Mindestens ein Markt bleibt bestehen.');return}if(!confirm('Markt „'+s+'“ löschen?'))return;delete storeRoutes[s];for(const i of items)if(i.targetStore===s)i.targetStore=null;if(activeStore===s)activeStore=Object.keys(storeRoutes)[0];broadcastState();renderStoreManagerList();renderStoreButtons();render()}
-async function shareList(){const url=location.origin+location.pathname+'#join='+encodeURIComponent(syncCode);try{await navigator.clipboard.writeText(url);status('Geheimer Verknüpfungslink kopiert. Nur mit vertrauten Personen teilen.')}catch(e){prompt('Diesen geheimen Link kopieren:',url)}}
-function openSyncModal(){$('sync-code-input').value=syncCode;$('sync-modal').style.display='flex'}
+async function shareList(){await restoreLegacyPairing();const url=location.origin+location.pathname+'#join='+encodeURIComponent(syncCode);try{await navigator.clipboard.writeText(url);status('Geheimer Verknüpfungslink kopiert. Nur mit vertrauten Personen teilen.')}catch(e){prompt('Diesen geheimen Link kopieren:',url)}}
+function openSyncModal(){networkStatus();$('sync-current-code').value=syncCode;$('sync-code-input').value='';$('sync-modal').style.display='flex'}
 function closeSyncModal(){$('sync-modal').style.display='none'}
 function saveSyncCode(){let val=$('sync-code-input').value.trim();try{val=new URLSearchParams(new URL(val).hash.slice(1)).get('join')||val}catch(e){}joinRoom(val);closeSyncModal()}
-function joinRoom(code){if(!/^[a-zA-Z0-9_-]{24,150}$/.test(code)){alert('Bitte einen vollständigen Verknüpfungslink oder geheimen Code mit mindestens 24 Zeichen verwenden.');return}if(code===syncCode)return;if(!confirm('Mit dieser gemeinsamen Liste verbinden? Deine bisherige Liste bleibt getrennt auf diesem Gerät gespeichert.'))return;persist();syncCode=code;records=db.rooms[code]||{};pending.clear();materialize();persist();renderStoreButtons();render();connect()}
+function joinRoom(code){code=String(code||'').trim();if(!/^[a-zA-Z0-9_-]{24,150}$/.test(code)){alert('Bitte einen vollständigen Verknüpfungslink oder geheimen Code mit mindestens 24 Zeichen verwenden.');return}if(code===syncCode)return;if(!confirm('Mit dieser gemeinsamen Liste verbinden? Deine bisherige Liste bleibt getrennt auf diesem Gerät gespeichert.'))return;persist();db.legacySyncMigrated=true;db.joinedExplicitly=true;syncCode=code;records=clone(db.rooms[code]||{});pendingSync=true;pending.clear();materialize();persist();renderStoreButtons();render();connect()}
 function exportBackup(){persist();const blob=new Blob([JSON.stringify({schema:3,records},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Einkaufsliste-Sicherung-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000)}
 $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>2000000)throw Error();const data=JSON.parse(await f.text());if(data.schema!==3||!data.records||!Object.entries(data.records).every(([id,r])=>validRecord(id,r)))throw Error();if(confirm('Sicherung in die aktuelle Liste übernehmen? Diese Änderungen werden mit verknüpften Geräten abgeglichen.')){for(const [id,r]of Object.entries(data.records))put(id,r.data);materialize();persist();renderStoreButtons();render();sendState()}}catch(e){alert('Diese Sicherung ist ungültig oder zu groß.')}finally{e.target.value=''}};
 function toggleVoice(){keepRecording?stopVoice():startVoice()}
@@ -112,7 +174,7 @@ function resetMic(){$('btn-mic').classList.remove('recording');$('btn-mic').text
 function stopVoice(){keepRecording=false;resetMic();try{recognition?.stop()}catch(e){}status('Aufnahme beendet. Deine Liste ist lokal gespeichert.')}
 async function setupPWA(){if(!('serviceWorker'in navigator)){status('Offline-Start wird von diesem Browser nicht unterstützt.');return}try{reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});const show=()=>{waitingWorker=reg.waiting;if(waitingWorker&&navigator.serviceWorker.controller)$('update').hidden=false};show();reg.addEventListener('updatefound',()=>{const w=reg.installing;w?.addEventListener('statechange',()=>{if(w.state==='installed'){show();if(!navigator.serviceWorker.controller)status('Offline-Dateien gespeichert. Die App kann jetzt offline geöffnet werden.')}})});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(sessionStorage.getItem('einkauf-updating')){sessionStorage.removeItem('einkauf-updating');location.reload()}});navigator.serviceWorker.ready.then(()=>{if(navigator.serviceWorker.controller)status('Offline bereit · Tastatur verfügbar, Sprache je nach Browser.');if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})});setInterval(()=>reg.update().catch(()=>{}),300000)}catch(e){$('app-state').textContent='Offline-Start konnte nicht eingerichtet werden. Bitte App über HTTPS öffnen.'}}
 async function checkUpdate(){if(!navigator.onLine){status('Du bist offline. Updates können später geprüft werden.');return}try{await reg?.update();if(reg?.waiting){waitingWorker=reg.waiting;$('update').hidden=false}else status('Update-Prüfung gestartet. Ein verfügbares Update wird zur Bestätigung angezeigt.')}catch(e){status('Updates konnten gerade nicht geprüft werden.')}}
-function applyUpdate(){if(!waitingWorker||!persist())return;stopVoice();sessionStorage.setItem('einkauf-updating','yes');waitingWorker.postMessage({type:'ACTIVATE'})}
+function applyUpdate(){waitingWorker=reg?.waiting||waitingWorker;if(!waitingWorker||!persist())return;stopVoice();sessionStorage.setItem('einkauf-updating','yes');waitingWorker.postMessage({type:'ACTIVATE'})}
 for(const overlay of document.querySelectorAll('.modal-overlay')){overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none'})}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of document.querySelectorAll('.modal-overlay'))o.style.display='none';$('dropdown-menu').classList.remove('show')}if(e.key==='Tab'){const modal=[...document.querySelectorAll('.modal-overlay')].find(o=>o.style.display==='flex');if(modal){const focus=[...modal.querySelectorAll('button,input,select')].filter(x=>!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus()}}}});
 init();
