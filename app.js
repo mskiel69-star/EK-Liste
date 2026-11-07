@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.3.0';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.3.1';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -140,15 +140,40 @@ function button(text,fn,cls='btn-action-icon',title=text){const b=document.creat
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
 function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions()}
-function itemRow(i,done=false){const row=text('div','',done?'done-item':'item-row');row.id='row_'+i.id;const check=document.createElement('input');check.type='checkbox';check.checked=done||pending.has(i.id);check.setAttribute('aria-label',i.title+(done?' wieder auf die Liste':' erledigen'));check.onchange=()=>done?toggleItemDirect(i.id):handleCheckWithAnimation(i.id);row.append(check);const info=text('div','','item-info');info.append(text('span',i.title,done?'title':'item-name'));if(i.note)info.append(text('span',i.note,'item-extra-note'));if(i.recipeQuantity&&!recipeAmountPattern.test(i.note||''))info.append(text('span',i.recipeQuantity,'item-extra-note'));if(i.targetStore)info.append(text('span','Bei '+i.targetStore,'badge-store'));info.append(button('Bearbeiten',()=>openEditor(i),'btn-action-icon secondary'));row.append(info);const actions=text('div','','item-actions');actions.append(button('✎',()=>openEditor(i),'btn-action-icon','Artikel bearbeiten'),button('×',()=>safeDeleteItem(i.id),'btn-action-icon danger','Artikel löschen'));row.append(actions);if(pending.has(i.id))decorate(row);return row}
+function itemRow(item, done = false) {
+  const row = text('div', '', done ? 'done-item' : 'item-row');
+  row.id = 'row_' + item.id;
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.checked = done || pending.has(item.id);
+  check.setAttribute('aria-label', item.title + (done ? ' wieder auf die Liste' : ' erledigen'));
+  check.onchange = () => done ? toggleItemDirect(item.id) : handleCheckWithAnimation(item.id);
+
+  const info = text('div', '', 'item-info');
+  info.append(text('span', item.title, done ? 'title' : 'item-name'));
+  if (item.note) info.append(text('span', item.note, 'item-extra-note'));
+  if (item.recipeQuantity && !recipeAmountPattern.test(item.note || '')) {
+    info.append(text('span', item.recipeQuantity, 'item-extra-note'));
+  }
+  if (item.targetStore) info.append(text('span', 'Bei ' + item.targetStore, 'badge-store'));
+
+  const actions = text('div', '', 'item-actions');
+  actions.append(
+    button('×', () => safeDeleteItem(item.id), 'btn-action-icon danger', 'Artikel löschen'),
+    button('✎', () => openEditor(item), 'btn-action-icon', 'Artikel bearbeiten')
+  );
+  row.append(check, info, actions);
+  if (pending.has(item.id)) decorate(row);
+  return row;
+}
 function decorate(row){row.classList.add('checking-out');const badge=text('div','','waving-badge');badge.append(text('span','Tschüss!','waving-text'),text('span','😊 👋','waving-hand-icon'));row.append(badge)}
 function handleCheckWithAnimation(id){if(pending.has(id))return;const i=items.find(i=>i.id===id);if(!i)return;i.done=true;i.completedAt=Date.now();broadcastState();pending.set(id,true);decorate($('row_'+id));setTimeout(()=>{pending.delete(id);const r=records['i:'+id];if(r?.data)Object.assign(i,r.data);materialize();render()},matchMedia('(prefers-reduced-motion: reduce)').matches?0:2500)}
 function toggleItemDirect(id){const i=items.find(i=>i.id===id);if(i){i.done=!i.done;i.completedAt=i.done?Date.now():null;broadcastState();render()}}
 function safeDeleteItem(id){const i=items.find(i=>i.id===id);if(i&&confirm('„'+i.title+'“ wirklich löschen?')){items=items.filter(i=>i.id!==id);pending.delete(id);broadcastState();render()}}
 function resetAllData(){if(confirm('Alle Artikel dieser verknüpften Liste löschen? Dies wird auch auf andere Geräte übertragen.')){items=[];pending.clear();broadcastState();render()}}
 function toggleDoneSection(){const e=$('done-list');e.style.display=e.style.display==='none'?'block':'none';$('done-arrow').textContent=e.style.display==='none'?'▼':'▲'}
-function parseText(raw){let t=raw.trim().replace(/[.!?]+$/,'');if(!t)return [];for(const s of Object.keys(storeRoutes)){if([norm(s),'zu '+norm(s),'bei '+norm(s),'wechsel zu '+norm(s)].includes(norm(t))){switchStore(s);return []}}
-if(/^(stopp?|aufnahme beenden)$/i.test(t)){stopVoice();return []}
+function parseText(raw, executeCommands = true){let t=raw.trim().replace(/[.!?]+$/,'');if(!t)return [];for(const s of Object.keys(storeRoutes)){if([norm(s),'zu '+norm(s),'bei '+norm(s),'wechsel zu '+norm(s)].includes(norm(t))){if(executeCommands)switchStore(s);return []}}
+if(/^(stopp?|aufnahme beenden)$/i.test(t)){if(executeCommands)stopVoice();return []}
 t=t.replace(/\b(ich brauche noch|wir brauchen noch|ich brauche|wir brauchen|ich möchte|wir möchten|kauf bitte|kaufe bitte|bring bitte mit|bring mit|besorge bitte)\b/gi,' ').replace(/\b(packe|pack|schreib|schreibe|setze|setz|tu)\s+(bitte\s+)?/gi,' ').replace(/\b(in die einkaufsliste|auf die einkaufsliste|auf die liste|in die liste|zur liste|dazu|bitte)\b/gi,' ').trim();
 const segments=t.split(/\s+(?:und|sowie|außerdem|dann noch)\s+|;\s*|,\s*(?!\d)/i), out=[];
 for(let seg of segments){let targetStore=null;for(const s of Object.keys(storeRoutes)){const escaped=s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');const re=new RegExp('(?:^|\\s)(?:(?:nur bei|bei|im|für)\\s+)?'+escaped+'(?=\\s|$)','i');if(re.test(seg)){targetStore=s;seg=seg.replace(re,' ').trim();break}}
@@ -290,7 +315,34 @@ function completedSuggestions(query){
  return items.filter(i=>i.done&&(identityText(i.title).includes(q)||identityText(i.title+' '+(i.note||'')).includes(q)))
  .sort((a,b)=>Number(identityText(b.title).startsWith(q))-Number(identityText(a.title).startsWith(q))||(b.completedAt||0)-(a.completedAt||0)||a.title.localeCompare(b.title,'de')).slice(0,6);
 }
+function describeInputItem(candidate) {
+  const label = [candidate.title, candidate.note].filter(Boolean).join(' · ');
+  const key = itemKey(candidate);
+  const exact = items.find(item => itemKey(item) === key);
+  if (exact) {
+    return label + (exact.done ? ' – schon abgehakt' : ' – bereits auf der Liste');
+  }
+  const title = identityText(candidate.title);
+  const related = items.find(item => !item.done && identityText(item.title).startsWith(title));
+  if (related) {
+    const relatedLabel = [related.title, related.note].filter(Boolean).join(' · ');
+    return label + (identityText(related.title) === title
+      ? ' – andere Variante auf der Liste (' + relatedLabel + ')'
+      : ' – passt zu „' + relatedLabel + '“ auf der Liste');
+  }
+  return label + ' – noch nicht auf der Liste';
+}
+
+function renderInputListStatus() {
+  const inputStatus = $('input-list-status');
+  const candidates = parseText($('manual-input').value, false);
+  const messages = [...new Set(candidates.map(describeInputItem))];
+  const next = messages.slice(0, 3).join(' | ');
+  if (inputStatus.textContent !== next) inputStatus.textContent = next;
+}
+
 function renderSuggestions(){
+ renderInputListStatus();
  const box=$('suggestions');if(!box)return;box.replaceChildren();
  const suggestions=completedSuggestions($('manual-input').value);box.hidden=!suggestions.length;
  $('manual-input').setAttribute('aria-expanded',String(suggestions.length>0));
