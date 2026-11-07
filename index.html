@@ -331,7 +331,7 @@
 :root {color-scheme:light}body{background:#f3f5ee;color:#213b30}.top-bar{padding:20px max(16px,calc((100vw - 660px)/2));box-shadow:none;border-color:#dce4d6}.store-header-row h2{font-size:1.22rem;color:#203c30}.store-header-row{margin-bottom:18px}.container,.input-inner-wrap{max-width:660px}.container{padding:16px}.card{box-shadow:none;background:transparent;padding:0}.btn-store{border-radius:24px;border:1px solid #cbd9ca;color:#345541;padding:10px 22px}.btn-store.active,.btn-modal{background:#285c45;color:white}.cat-block{border:1px solid #dce4d6;border-radius:15px;margin-bottom:18px}.cat-header{background:#e5ebdf;padding:12px 15px;font-size:.85rem;color:#3b5848}.item-row{padding:14px 12px;min-height:68px}.item-row input[type=checkbox]{accent-color:#285c45;width:26px;height:26px}.item-name{color:#213b30}.btn-action-icon{min-width:32px;min-height:36px;border:0;background:#f2f5ef}.bottom-input-bar{padding:14px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px #203c300d;border-color:#dce4d6}.compact-row input[type=text]{min-width:0;padding:14px}.btn-add-compact{background:#285c45;width:48px;height:48px}.btn-mic-icon-only{height:48px;width:48px;background:#415f50}.status-text{white-space:normal;min-height:20px;line-height:1.4;padding-top:6px}.notice{max-width:628px;margin:14px auto 0;padding:12px 16px;background:#e4ebdb;border-radius:10px;font-size:.84rem;line-height:1.5}.notice button{padding:8px;border:1px solid #a6b9a2;border-radius:7px;background:white;margin:4px}.list-heading{display:flex;justify-content:space-between;align-items:center;margin:8px 0 18px}.list-heading h2{font-size:1.6rem;color:#203c30;margin:0}#count{color:#56705b;font-size:.85rem}.empty{padding:50px 20px;text-align:center;color:#607661;line-height:1.7}.done-wrapper{border-color:#dce4d6;border-radius:12px}.done-header{background:#e5ebdf}.item-info{cursor:pointer}.drag-item button{min-width:34px;min-height:36px}.item-actions{gap:0}.btn-menu-toggle,.btn-share-icon{min-height:40px;background:#f3f5ee;border-color:#dce4d6}.modal-overlay{overscroll-behavior:contain}.modal h2{color:#285c45}.modal input{min-width:0}button:focus-visible,input:focus-visible{outline:3px solid #bc7400;outline-offset:3px}button{touch-action:manipulation}#update[hidden]{display:none}@media(max-width:400px){.item-actions .secondary{display:none}.store-header-row h2{font-size:1rem}.notice{margin-left:12px;margin-right:12px}.header-actions{gap:4px}}@media(prefers-reduced-motion:reduce){.item-row.checking-out{animation:none}.waving-hand-icon{animation:none}} 
 </style><style>
 .input-inner-wrap{position:relative}#suggestions{position:absolute;bottom:calc(100% + 12px);left:0;right:0;max-height:28vh;overflow-y:auto;background:white;border:1px solid #cbd9ca;border-radius:14px;box-shadow:0 6px 25px #203c3026;padding:8px;z-index:110}#suggestions[hidden]{display:none}.suggestions-title{font-size:.8rem;color:#56705b;padding:6px 10px}.suggestion{display:block;width:100%;border:0;border-radius:8px;background:white;padding:12px 10px;text-align:left;font-size:1rem;color:#213b30;cursor:pointer}.suggestion:hover,.suggestion:focus-visible{background:#e5ebdf}
-</style></head>
+</style><style>#info-panel[hidden]{display:none}#info-toggle{font-family:Georgia,serif;font-size:1.1rem;font-weight:bold;min-width:40px}#info-toggle[aria-expanded="true"]{background:#e5ebdf}</style></head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
   <div class="top-bar">
@@ -341,14 +341,14 @@
         <h2>Maiks Einkaufsliste</h2>
       </div>
 
-      <div class="header-actions">
+      <div class="header-actions"><button id="info-toggle" class="btn-share-icon" type="button" aria-label="Informationen" aria-controls="info-panel" aria-expanded="false" onclick="toggleInfo()" title="Informationen">i</button>
         <button class="btn-share-icon" onclick="shareList()" title="Sync-Link kopieren">🔗</button>
 
         <div class="menu-container">
           <button class="btn-menu-toggle" onclick="toggleDropdownMenu(event)">
             ⚙️ Optionen ▾
           </button>
-          <div class="dropdown-menu" id="dropdown-menu"><div id="app-version" class="dropdown-item" style="cursor:default;font-size:0.8rem;color:#607661" role="note"></div><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
+          <div class="dropdown-menu" id="dropdown-menu"><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
             <button class="dropdown-item" onclick="handleMenuClick(openRouteModal)">
               ⚙️ Laufweg ordnen
             </button>
@@ -372,7 +372,7 @@
     <div class="store-bar-scroll" id="store-buttons-container"></div>
   </div>
 
-  <div id="app-state" role="status" class="notice">Offline-Speicher wird vorbereitet …</div><div id="update" class="notice" hidden>Eine neue App-Version ist verfügbar. Jetzt übernehmen? <button onclick="applyUpdate()">Jetzt aktualisieren</button> <button onclick="this.parentNode.hidden=true">Später</button></div><div class="container">
+  <section id="info-panel" class="notice" aria-label="App-Informationen" hidden><h2>Informationen</h2><div id="app-state" role="status">Offline-Speicher wird vorbereitet …</div><p id="app-version" style="font-size:0.8rem;color:#607661" role="note"></p><button type="button" onclick="toggleInfo()">Schließen</button></section><div id="update" class="notice" hidden>Eine neue App-Version ist verfügbar. Jetzt übernehmen? <button onclick="applyUpdate()">Jetzt aktualisieren</button> <button onclick="this.parentNode.hidden=true">Später</button></div><div class="container">
     <div class="card">
       <div class="list-heading"><h2>Dein Einkauf</h2><span id="count"></span></div>
       <div id="list-container">Keine Artikel auf der Liste.</div>
