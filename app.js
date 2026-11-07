@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.3.2';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.0';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -45,7 +45,15 @@ function deduplicateRecords(){
   group.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
   const canonical=group[0][0];let latest=group[0][1];
   for(const [,r]of group)if(newer(r,latest))latest=r;
-  put(canonical,{...clone(latest.data),id:canonical.slice(2)});
+  const merged = {...clone(latest.data), id:canonical.slice(2)};
+  if (merged.image === undefined) {
+    let withImage;
+    for (const [, record] of group) {
+      if (record.data.image !== undefined && newer(record, withImage)) withImage = record;
+    }
+    if (withImage) merged.image = withImage.data.image;
+  }
+  put(canonical, merged);
   for(const [id]of group)if(id!==canonical){put(id,null);pending.delete(id)}
   changed=true;
  }
@@ -53,11 +61,18 @@ function deduplicateRecords(){
 }
 function materialize(){deduplicateRecords();items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
 function validText(s,n=200){return typeof s==='string'&&s.length<=n}
-function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean';if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
+function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean'&&validItemImage(d.image);if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
 function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();render()}return changed}
 function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();if(persist())sendState()}
 const enc=new TextEncoder(),dec=new TextDecoder();
-const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+function b64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 16384) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
+  }
+  return btoa(binary);
+}
 const unb64=s=>Uint8Array.from(atob(s),x=>x.charCodeAt(0));
 async function derive(){const digest=await crypto.subtle.digest('SHA-256',enc.encode(syncCode));key=await crypto.subtle.importKey('raw',digest,'AES-GCM',false,['encrypt','decrypt']);topic='maik-einkauf-v3/'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode('topic:'+syncCode))),x=>x.toString(16).padStart(2,'0')).join('')}
 // Independent retained snapshots avoid overwriting an offline device's changes at reconnect.
@@ -140,6 +155,85 @@ function button(text,fn,cls='btn-action-icon',title=text){const b=document.creat
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
 function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions()}
+
+const itemImageLimit = 8000;
+const listImageLimit = 550000;
+const itemPictures = new Map();
+for (const [picture, names] of [
+  ['🥛', 'milch sahne joghurt quark kefir hafermilch'], ['🧀', 'käse butter frischkäse'],
+  ['🥚', 'ei eier'], ['🍎', 'apfel äpfel'], ['🍐', 'birne birnen'], ['🍌', 'banane bananen'],
+  ['🍊', 'orange orangen mandarinen'], ['🍋', 'zitrone zitronen'], ['🍓', 'erdbeere erdbeeren'],
+  ['🍅', 'tomate tomaten'], ['🥒', 'gurke gurken zucchini'], ['🥬', 'salat spinat porree lauch'],
+  ['🥔', 'kartoffel kartoffeln'], ['🥕', 'möhre möhren karotte karotten'], ['🫑', 'paprika'],
+  ['🧅', 'zwiebel zwiebeln'], ['🧄', 'knoblauch'], ['🥦', 'brokkoli'], ['🍄', 'pilze champignons'],
+  ['🥑', 'avocado'], ['🍞', 'brot roggenbrot dinkelbrot toast vollkornbrot mehl hefe'],
+  ['🥖', 'brötchen baguette'], ['🍝', 'nudeln spaghetti pasta'], ['🍚', 'reis'],
+  ['🥩', 'fleisch hack hackfleisch steak'], ['🍗', 'hähnchen'], ['🌭', 'wurst bratwurst salami schinken'],
+  ['🐟', 'fisch lachs thunfisch'], ['🍫', 'schokolade'], ['🍪', 'kekse keks'], ['🍬', 'gummibärchen'],
+  ['🥤', 'wasser cola saft'], ['🥔', 'chips'], ['🍺', 'bier'], ['☕', 'kaffee tee'],
+  ['🧻', 'toilettenpapier klopapier küchenrolle'], ['🧴', 'seife shampoo'], ['🫒', 'öl olivenöl']
+]) {
+  for (const name of names.split(' ')) itemPictures.set(name, picture);
+}
+const categoryPictures = new Map([
+  ['Gemüse', '🥬'], ['Brot', '🍞'], ['Kühlregal', '🥛'], ['Fleisch und Wurst', '🥩'],
+  ['Süßigkeiten', '🍬'], ['Nudeln und Getreide', '🍚'], ['Getränke', '🥤'], ['Drogerie', '🧴']
+]);
+
+function validItemImage(image) {
+  return image == null || (typeof image === 'string' && image.length <= itemImageLimit &&
+    /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
+}
+
+function articlePicture(item) {
+  const frame = text('span', '', 'article-picture');
+  frame.setAttribute('aria-hidden', 'true');
+  const name = identityText(item.title);
+  const fallback = itemPictures.get(name) || itemPictures.get(name.split(' ')[0]) ||
+    categoryPictures.get(item.category) || '🛒';
+  if (item.image && validItemImage(item.image)) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.src = item.image;
+    image.onerror = () => { frame.textContent = fallback; };
+    frame.append(image);
+  } else {
+    frame.textContent = fallback;
+  }
+  return frame;
+}
+
+async function makeItemThumbnail(file) {
+  if (!file.size || file.size > 20 * 1024 * 1024 ||
+      (file.type && !/^image\/(jpeg|png|webp|gif|heic|heif|avif)$/i.test(file.type))) {
+    throw new Error('Wähle ein unterstütztes Bild mit höchstens 20 MB.');
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const side = Math.min(image.naturalWidth, image.naturalHeight);
+    if (!context || !side) throw new Error('Das Bild konnte nicht geöffnet werden.');
+    for (const size of [112, 88, 64]) {
+      canvas.width = canvas.height = size;
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, size, size);
+      context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2,
+        side, side, 0, 0, size, size);
+      for (const quality of [0.8, 0.6, 0.4]) {
+        const thumbnail = canvas.toDataURL('image/jpeg', quality);
+        if (validItemImage(thumbnail)) return thumbnail;
+      }
+    }
+    throw new Error('Das Bild konnte nicht ausreichend verkleinert werden.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function itemRow(item, done = false) {
   const row = text('div', '', done ? 'done-item' : 'item-row');
   row.id = 'row_' + item.id;
@@ -162,7 +256,7 @@ function itemRow(item, done = false) {
     button('×', () => safeDeleteItem(item.id), 'btn-action-icon danger', 'Artikel löschen'),
     button('✎', () => openEditor(item), 'btn-action-icon', 'Artikel bearbeiten')
   );
-  row.append(check, info, actions);
+  row.append(check, articlePicture(item), info, actions);
   if (pending.has(item.id)) decorate(row);
   return row;
 }
@@ -366,7 +460,131 @@ function handleInputKey(e){
  if(e.key==='Escape'){$('suggestions').hidden=true;$('manual-input').setAttribute('aria-expanded','false')}
 }
 function addFromInput(){const value=$('manual-input').value;if(value.trim()){parseAndAdd(value);$('manual-input').value='';renderSuggestions();$('manual-input').focus()}}
-function openEditor(i){editingItemId=i.id;editingNoteItemId=i.id;editingStoreItemId=i.id;const modal=$('note-modal').querySelector('.modal');modal.replaceChildren();modal.append(text('h2','Artikel bearbeiten'));const form=document.createElement('form');const fields={};for(const [label,id,value]of [['Artikel','title',i.title],['Bemerkung / Preis','note',i.note||'']]){const l=text('label',label);const input=document.createElement('input');input.value=value;input.maxLength=200;input.required=id==='title';input.style='width:100%;padding:12px;margin:6px 0 16px';l.append(input);form.append(l);fields[id]=input}for(const [label,id,values,value]of [['Kategorie','category',[...new Set(Object.values(storeRoutes).flat())],i.category],['Supermarkt','targetStore',['',...Object.keys(storeRoutes)],i.targetStore||'']]){const l=text('label',label);const select=document.createElement('select');select.style='width:100%;padding:12px;margin:6px 0 16px';for(const v of [...new Set([...values,value])]){const option=text('option',v||'In jedem Markt');option.value=v;select.append(option)}select.value=value;fields[id]=select;l.append(select);form.append(l)}const save=button('Speichern',()=>{},'btn-modal');save.type='submit';form.append(save,button('Abbrechen',closeNoteModal,'btn-modal'));form.onsubmit=e=>{e.preventDefault();const current=items.find(x=>x.id===i.id);if(!current){closeNoteModal();return}for(const [k,input]of Object.entries(fields))current[k]=input.value.trim();categoryDict[norm(current.title)]=current.category;broadcastState();render();closeNoteModal()};modal.append(form);$('note-modal').style.display='flex';fields.title.focus()}
+
+function openEditor(item) {
+  editingItemId = editingNoteItemId = editingStoreItemId = item.id;
+  const overlay = $('note-modal');
+  const modal = overlay.querySelector('.modal');
+  modal.replaceChildren(text('h2', 'Artikel bearbeiten'));
+  const form = document.createElement('form');
+  const fields = {};
+  for (const [label, field, value] of [['Artikel', 'title', item.title], ['Bemerkung / Preis', 'note', item.note || '']]) {
+    const wrapper = text('label', label);
+    const input = document.createElement('input');
+    input.value = value;
+    input.maxLength = 200;
+    input.required = field === 'title';
+    input.style = 'width:100%;padding:12px;margin:6px 0 16px';
+    wrapper.append(input);
+    form.append(wrapper);
+    fields[field] = input;
+  }
+  for (const [label, field, values, value] of [
+    ['Kategorie', 'category', [...new Set(Object.values(storeRoutes).flat())], item.category],
+    ['Supermarkt', 'targetStore', ['', ...Object.keys(storeRoutes)], item.targetStore || '']
+  ]) {
+    const wrapper = text('label', label);
+    const select = document.createElement('select');
+    select.style = 'width:100%;padding:12px;margin:6px 0 16px';
+    for (const choice of new Set([...values, value])) {
+      const option = text('option', choice || 'In jedem Markt');
+      option.value = choice;
+      select.append(option);
+    }
+    select.value = value;
+    wrapper.append(select);
+    form.append(wrapper);
+    fields[field] = select;
+  }
+
+  let draftImage = item.image || null;
+  let imageChanged = false;
+  let selection = 0;
+  const pictureEditor = text('fieldset', '', 'picture-editor');
+  pictureEditor.append(text('legend', 'Artikelbild'));
+  const preview = text('div', '', 'picture-preview');
+  const fileLabel = text('label', 'Eigenes Foto auswählen');
+  const file = document.createElement('input');
+  file.type = 'file';
+  file.accept = 'image/*';
+  fileLabel.append(file);
+  const message = text('p', '', 'picture-message');
+  message.setAttribute('role', 'status');
+  const save = button('Speichern', () => {}, 'btn-modal');
+  save.type = 'submit';
+
+  const remove = button('Standardbild verwenden', () => {
+    selection++;
+    file.value = '';
+    draftImage = null;
+    imageChanged = true;
+    message.textContent = '';
+    save.disabled = false;
+    updatePreview();
+  }, 'btn-action-icon');
+
+  function updatePreview() {
+    preview.replaceChildren(articlePicture({...item, image: draftImage}));
+    remove.disabled = !draftImage;
+  }
+
+  file.onchange = async () => {
+    const selected = file.files[0];
+    const revision = ++selection;
+    if (!selected) {
+      save.disabled = false;
+      message.textContent = '';
+      return;
+    }
+    save.disabled = true;
+    message.textContent = 'Foto wird verkleinert …';
+    try {
+      const thumbnail = await makeItemThumbnail(selected);
+      if (revision !== selection) return;
+      draftImage = thumbnail;
+      imageChanged = true;
+      updatePreview();
+      message.textContent = 'Foto ist bereit. Tippe auf Speichern.';
+    } catch (error) {
+      if (revision !== selection) return;
+      file.value = '';
+      message.textContent = error instanceof Error && error.message.startsWith('Wähle')
+        ? error.message : 'Foto konnte nicht geöffnet werden. Versuche es mit JPG oder PNG.';
+    } finally {
+      if (revision === selection) save.disabled = false;
+    }
+  };
+
+  updatePreview();
+  pictureEditor.append(preview, fileLabel, remove, message);
+  form.append(pictureEditor, save, button('Abbrechen', closeNoteModal, 'btn-modal'));
+  form.onsubmit = event => {
+    event.preventDefault();
+    if (save.disabled) return;
+    const current = items.find(entry => entry.id === item.id);
+    if (!current) {
+      closeNoteModal();
+      return;
+    }
+    if (imageChanged && draftImage) {
+      const imageSize = items.reduce((size, entry) =>
+        size + (entry.id === item.id ? 0 : (entry.image || '').length), draftImage.length);
+      if (imageSize > listImageLimit) {
+        message.textContent = 'Die Liste hat ihr Fotolimit erreicht. Entferne zuerst ein eigenes Foto.';
+        return;
+      }
+    }
+    for (const [field, input] of Object.entries(fields)) current[field] = input.value.trim();
+    if (imageChanged) current.image = draftImage;
+    categoryDict[norm(current.title)] = current.category;
+    broadcastState();
+    render();
+    closeNoteModal();
+  };
+  modal.append(form);
+  overlay.style.display = 'flex';
+  fields.title.focus();
+}
 function closeNoteModal(){$('note-modal').style.display='none'}
 function toggleInfo(){const panel=$('info-panel');panel.hidden=!panel.hidden;$('info-toggle').setAttribute('aria-expanded',String(!panel.hidden));if(panel.hidden)$('info-toggle').focus()}
 function toggleDropdownMenu(e){e.stopPropagation();$('dropdown-menu').classList.toggle('show')}
