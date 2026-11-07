@@ -348,7 +348,7 @@
           <button class="btn-menu-toggle" onclick="toggleDropdownMenu(event)">
             ⚙️ Optionen ▾
           </button>
-          <div class="dropdown-menu" id="dropdown-menu"><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
+          <div class="dropdown-menu" id="dropdown-menu"><button class="dropdown-item" onclick="handleMenuClick(openRecipeImport)">Zutaten aus Rezept</button><button class="dropdown-item" onclick="handleMenuClick(checkUpdate)">↻ Auf Updates prüfen</button><button class="dropdown-item" onclick="handleMenuClick(exportBackup)">↓ Sicherung exportieren</button><button class="dropdown-item" onclick="document.getElementById('import-file').click()">↑ Sicherung importieren</button>
             <button class="dropdown-item" onclick="handleMenuClick(openRouteModal)">
               ⚙️ Laufweg ordnen
             </button>
@@ -476,4 +476,16 @@
     </div>
   </div>
 
+<div class="modal-overlay" id="recipe-modal" aria-labelledby="recipe-heading">
+    <div class="modal">
+      <h2 id="recipe-heading" tabindex="-1">Zutaten abgleichen</h2>
+      <label for="recipe-link">Rezeptlink</label>
+      <input id="recipe-link" type="url" placeholder="Rezeptlink hier einfügen" style="width:100%;padding:10px">
+      <button class="btn-modal" type="button" onclick="loadRecipeLink()">Link prüfen</button>
+      <p id="recipe-message" role="status"></p>
+      <ul id="recipe-preview"></ul>
+      <button id="recipe-apply" class="btn-modal" type="button" onclick="confirmRecipeImport()" disabled>Fehlende Zutaten hinzufügen</button>
+      <button class="btn-modal" type="button" onclick="closeRecipeImport()">Schließen</button>
+    </div>
+  </div>
 <input id="import-file" type="file" accept="application/json" hidden><script src="./mqtt.min.js" defer></script><script src="./app.js" defer></script></body></html>

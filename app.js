@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.2.2';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.3.0';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -140,7 +140,7 @@ function button(text,fn,cls='btn-action-icon',title=text){const b=document.creat
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
 function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions()}
-function itemRow(i,done=false){const row=text('div','',done?'done-item':'item-row');row.id='row_'+i.id;const check=document.createElement('input');check.type='checkbox';check.checked=done||pending.has(i.id);check.setAttribute('aria-label',i.title+(done?' wieder auf die Liste':' erledigen'));check.onchange=()=>done?toggleItemDirect(i.id):handleCheckWithAnimation(i.id);row.append(check);const info=text('div','','item-info');info.append(text('span',i.title,done?'title':'item-name'));if(i.note)info.append(text('span',i.note,'item-extra-note'));if(i.targetStore)info.append(text('span','Bei '+i.targetStore,'badge-store'));info.append(button('Bearbeiten',()=>openEditor(i),'btn-action-icon secondary'));row.append(info);const actions=text('div','','item-actions');actions.append(button('✎',()=>openEditor(i),'btn-action-icon','Artikel bearbeiten'),button('×',()=>safeDeleteItem(i.id),'btn-action-icon danger','Artikel löschen'));row.append(actions);if(pending.has(i.id))decorate(row);return row}
+function itemRow(i,done=false){const row=text('div','',done?'done-item':'item-row');row.id='row_'+i.id;const check=document.createElement('input');check.type='checkbox';check.checked=done||pending.has(i.id);check.setAttribute('aria-label',i.title+(done?' wieder auf die Liste':' erledigen'));check.onchange=()=>done?toggleItemDirect(i.id):handleCheckWithAnimation(i.id);row.append(check);const info=text('div','','item-info');info.append(text('span',i.title,done?'title':'item-name'));if(i.note)info.append(text('span',i.note,'item-extra-note'));if(i.recipeQuantity&&!recipeAmountPattern.test(i.note||''))info.append(text('span',i.recipeQuantity,'item-extra-note'));if(i.targetStore)info.append(text('span','Bei '+i.targetStore,'badge-store'));info.append(button('Bearbeiten',()=>openEditor(i),'btn-action-icon secondary'));row.append(info);const actions=text('div','','item-actions');actions.append(button('✎',()=>openEditor(i),'btn-action-icon','Artikel bearbeiten'),button('×',()=>safeDeleteItem(i.id),'btn-action-icon danger','Artikel löschen'));row.append(actions);if(pending.has(i.id))decorate(row);return row}
 function decorate(row){row.classList.add('checking-out');const badge=text('div','','waving-badge');badge.append(text('span','Tschüss!','waving-text'),text('span','😊 👋','waving-hand-icon'));row.append(badge)}
 function handleCheckWithAnimation(id){if(pending.has(id))return;const i=items.find(i=>i.id===id);if(!i)return;i.done=true;i.completedAt=Date.now();broadcastState();pending.set(id,true);decorate($('row_'+id));setTimeout(()=>{pending.delete(id);const r=records['i:'+id];if(r?.data)Object.assign(i,r.data);materialize();render()},matchMedia('(prefers-reduced-motion: reduce)').matches?0:2500)}
 function toggleItemDirect(id){const i=items.find(i=>i.id===id);if(i){i.done=!i.done;i.completedAt=i.done?Date.now():null;broadcastState();render()}}
@@ -163,6 +163,128 @@ function parseAndAdd(raw){const parsed=parseText(raw);for(const p of parsed){
  if(existing){pending.delete(existing.id);existing.done=false;existing.completedAt=null;if(p.targetStore)existing.targetStore=p.targetStore}
  else items.push({...p,id:uuid(),done:false,completedAt:null});
  }if(parsed.length){broadcastState();render();status(parsed.length+' Artikel verarbeitet · lokal gespeichert.')}}
+
+const recipeAmountPattern = /^(?:\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?|[¼½¾])\s*(?:kg|g|mg|ml|cl|dl|l|liter|stk\.?|stück|el|tl|packungen?|dosen?|flaschen?|bund|becher)?$/iu;
+let recipeIngredients = [];
+
+function readRecipeIngredients(payload) {
+  if (typeof payload !== 'string' || payload.length > 16000) throw new Error('Ungültiger Rezeptlink');
+  const rows = JSON.parse(payload);
+  if (!Array.isArray(rows) || !rows.length || rows.length > 60) throw new Error('Ungültige Zutatenliste');
+  const unique = new Map();
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length < 1 || row.length > 3 ||
+        !row.every(value => typeof value === 'string')) throw new Error('Ungültige Zutat');
+    const [title, recipeQuantity = '', note = ''] = row.map(value => value.trim());
+    if (!title || title.length > 200 || recipeQuantity.length > 60 || note.length > 200) {
+      throw new Error('Ungültige Zutat');
+    }
+    const ingredient = {title, note, recipeQuantity};
+    if (!unique.has(itemKey(ingredient))) unique.set(itemKey(ingredient), ingredient);
+  }
+  return [...unique.values()];
+}
+
+function recipeItemKey(item) {
+  const note = (item.note || '').split(' · ')
+    .filter(part => !recipeAmountPattern.test(part.trim())).join(' · ');
+  return itemKey({title: item.title, note});
+}
+
+function planRecipeImport(ingredients) {
+  return ingredients.map(ingredient => {
+    const key = itemKey(ingredient);
+    const matching = items.filter(item => recipeItemKey(item) === key);
+    return {ingredient, open: matching.some(item => !item.done), done: matching.find(item => item.done)};
+  });
+}
+
+function openRecipeImport(payload) {
+  recipeIngredients = [];
+  $('recipe-link').value = '';
+  $('recipe-message').textContent = '';
+  if (typeof payload === 'string') {
+    try {
+      recipeIngredients = readRecipeIngredients(payload);
+    } catch {
+      $('recipe-message').textContent = 'Dieser Rezeptlink enthält keine gültigen Zutaten.';
+    }
+  }
+  renderRecipePreview();
+  $('recipe-modal').style.display = 'flex';
+  $(recipeIngredients.length ? 'recipe-heading' : 'recipe-link').focus();
+}
+
+function loadRecipeLink() {
+  try {
+    const url = new URL($('recipe-link').value.trim());
+    if (url.origin !== location.origin || url.pathname !== location.pathname) throw new Error();
+    const payload = new URLSearchParams(url.hash.slice(1)).get('zutaten');
+    if (!payload) throw new Error();
+    openRecipeImport(payload);
+  } catch {
+    $('recipe-message').textContent = 'Füge einen vollständigen Rezeptlink zu dieser Einkaufs-App ein.';
+  }
+}
+
+function renderRecipePreview() {
+  const list = $('recipe-preview');
+  list.replaceChildren();
+  const plan = planRecipeImport(recipeIngredients);
+  for (const {ingredient, open} of plan) {
+    const label = [ingredient.recipeQuantity, ingredient.title, ingredient.note].filter(Boolean).join(' · ');
+    list.append(text('li', label + (open ? ' – bereits auf der Liste' : ' – fehlt')));
+  }
+  const missing = plan.filter(row => !row.open).length;
+  $('recipe-apply').disabled = missing === 0;
+  $('recipe-apply').textContent = missing ? 'Fehlende Zutaten hinzufügen (' + missing + ')' : 'Keine Zutaten hinzufügen';
+}
+
+function applyRecipeIngredients(ingredients) {
+  const plan = planRecipeImport(ingredients);
+  let added = 0;
+  for (const {ingredient, open, done} of plan) {
+    if (open) continue;
+    if (done) {
+      pending.delete(done.id);
+      done.done = false;
+      done.completedAt = null;
+      done.recipeQuantity = ingredient.recipeQuantity;
+    } else {
+      items.push({...ingredient, id: uuid(), done: false, completedAt: null,
+        category: categoryDict[norm(ingredient.title)] || 'Sonstiges', targetStore: null});
+    }
+    added++;
+  }
+  if (added) {
+    broadcastState();
+    render();
+  }
+  return added;
+}
+
+async function confirmRecipeImport() {
+  const ingredients = recipeIngredients;
+  $('recipe-apply').disabled = true;
+  await restoreLegacyPairing();
+  if (ingredients !== recipeIngredients || $('recipe-modal').style.display !== 'flex') return;
+  const added = applyRecipeIngredients(ingredients);
+  closeRecipeImport();
+  status(added ? added + ' fehlende Zutaten zur Liste hinzugefügt.' : 'Alle Zutaten stehen bereits auf der Liste.');
+}
+
+function closeRecipeImport() {
+  recipeIngredients = [];
+  $('recipe-modal').style.display = 'none';
+}
+
+function readIncomingRecipe() {
+  const payload = new URLSearchParams(location.hash.slice(1)).get('zutaten');
+  if (payload === null) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  openRecipeImport(payload);
+}
+
 function completedSuggestions(query){
  const q=identityText(query);if(!q)return [];
  return items.filter(i=>i.done&&(identityText(i.title).includes(q)||identityText(i.title+' '+(i.note||'')).includes(q)))
@@ -233,3 +355,5 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of docu
 $('manual-input').addEventListener('input',renderSuggestions);
 $('app-version').textContent='Version '+APP_VERSION;
 init();
+readIncomingRecipe();
+window.addEventListener('hashchange', readIncomingRecipe);
