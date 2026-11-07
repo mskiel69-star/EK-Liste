@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.0';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.1';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -158,23 +158,6 @@ function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=
 
 const itemImageLimit = 8000;
 const listImageLimit = 550000;
-const itemPictures = new Map();
-for (const [picture, names] of [
-  ['🥛', 'milch sahne joghurt quark kefir hafermilch'], ['🧀', 'käse butter frischkäse'],
-  ['🥚', 'ei eier'], ['🍎', 'apfel äpfel'], ['🍐', 'birne birnen'], ['🍌', 'banane bananen'],
-  ['🍊', 'orange orangen mandarinen'], ['🍋', 'zitrone zitronen'], ['🍓', 'erdbeere erdbeeren'],
-  ['🍅', 'tomate tomaten'], ['🥒', 'gurke gurken zucchini'], ['🥬', 'salat spinat porree lauch'],
-  ['🥔', 'kartoffel kartoffeln'], ['🥕', 'möhre möhren karotte karotten'], ['🫑', 'paprika'],
-  ['🧅', 'zwiebel zwiebeln'], ['🧄', 'knoblauch'], ['🥦', 'brokkoli'], ['🍄', 'pilze champignons'],
-  ['🥑', 'avocado'], ['🍞', 'brot roggenbrot dinkelbrot toast vollkornbrot mehl hefe'],
-  ['🥖', 'brötchen baguette'], ['🍝', 'nudeln spaghetti pasta'], ['🍚', 'reis'],
-  ['🥩', 'fleisch hack hackfleisch steak'], ['🍗', 'hähnchen'], ['🌭', 'wurst bratwurst salami schinken'],
-  ['🐟', 'fisch lachs thunfisch'], ['🍫', 'schokolade'], ['🍪', 'kekse keks'], ['🍬', 'gummibärchen'],
-  ['🥤', 'wasser cola saft'], ['🥔', 'chips'], ['🍺', 'bier'], ['☕', 'kaffee tee'],
-  ['🧻', 'toilettenpapier klopapier küchenrolle'], ['🧴', 'seife shampoo'], ['🫒', 'öl olivenöl']
-]) {
-  for (const name of names.split(' ')) itemPictures.set(name, picture);
-}
 const categoryPictures = new Map([
   ['Gemüse', '🥬'], ['Brot', '🍞'], ['Kühlregal', '🥛'], ['Fleisch und Wurst', '🥩'],
   ['Süßigkeiten', '🍬'], ['Nudeln und Getreide', '🍚'], ['Getränke', '🥤'], ['Drogerie', '🧴']
@@ -188,17 +171,29 @@ function validItemImage(image) {
 function articlePicture(item) {
   const frame = text('span', '', 'article-picture');
   frame.setAttribute('aria-hidden', 'true');
-  const name = identityText(item.title);
-  const fallback = itemPictures.get(name) || itemPictures.get(name.split(' ')[0]) ||
-    categoryPictures.get(item.category) || '🛒';
+  const fullName = [item.title, item.note].filter(Boolean).join(' ');
+  const fallback = productPictureFor(fullName) || categoryPictures.get(item.category) || '🛒';
+  const showDefault = () => {
+    const drawing = productPictureDrawings[fallback];
+    if (!drawing) {
+      frame.textContent = fallback;
+      return;
+    }
+    const icon = document.createElement('img');
+    icon.alt = '';
+    icon.src = 'data:image/svg+xml,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">' + drawing + '</svg>'
+    );
+    frame.replaceChildren(icon);
+  };
   if (item.image && validItemImage(item.image)) {
     const image = document.createElement('img');
     image.alt = '';
     image.src = item.image;
-    image.onerror = () => { frame.textContent = fallback; };
+    image.onerror = showDefault;
     frame.append(image);
   } else {
-    frame.textContent = fallback;
+    showDefault();
   }
   return frame;
 }
