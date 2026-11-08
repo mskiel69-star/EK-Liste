@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.1';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.2';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -59,11 +59,23 @@ function deduplicateRecords(){
  }
  return changed;
 }
-function materialize(){deduplicateRecords();items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=Object.keys(storeRoutes)[0]}
+const storeOrderRecord = 'm:store-order';
+
+function orderedStores() {
+  const names = Object.keys(storeRoutes);
+  const saved = records[storeOrderRecord]?.data;
+  if (!Array.isArray(saved)) return names;
+  const current = new Set(names);
+  const order = new Set(saved.filter(name => current.has(name)));
+  const newNames = names.filter(name => !order.has(name)).sort();
+  return [...order, ...newNames];
+}
+
+function materialize(){deduplicateRecords();items=[];storeRoutes=Object.create(null);categoryDict=Object.assign(Object.create(null),initialDict);for(const [id,r] of Object.entries(records)){clock=Math.max(clock,r.v[0]);if(r.data===null)continue;if(id.startsWith('i:'))items.push(clone(r.data));if(id.startsWith('s:'))storeRoutes[id.slice(2)]=clone(r.data);if(id.startsWith('d:'))categoryDict[id.slice(2)]=r.data}if(!Object.keys(storeRoutes).length){for(const [s,route]of Object.entries(defaultRoutes)){records['s:'+s]={v:[0,'default'],data:clone(route)};storeRoutes[s]=clone(route)}}if(!storeRoutes[activeStore])activeStore=orderedStores()[0]}
 function validText(s,n=200){return typeof s==='string'&&s.length<=n}
-function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean'&&validItemImage(d.image);if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
-function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();render()}return changed}
-function broadcastState(){const desired={};for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();if(persist())sendState()}
+function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id===storeOrderRecord)return Array.isArray(d)&&d.every(name=>validText(name,80)&&name.trim());if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean'&&validItemImage(d.image);if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
+function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();if($('store-manager-modal').style.display==='flex')renderStoreManagerList();render()}return changed}
+function broadcastState(){const desired={};if(Array.isArray(records[storeOrderRecord]?.data))desired[storeOrderRecord]=orderedStores();for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();if(persist())sendState()}
 const enc=new TextEncoder(),dec=new TextDecoder();
 function b64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -150,7 +162,7 @@ if(!db.room){try{const legacy=JSON.parse(localStorage.getItem('local_einkaufslis
 materialize();persist();renderStoreButtons();render();connect();setupPWA();const invite=new URLSearchParams(location.hash.slice(1)).get('join');if(invite){history.replaceState(null,'',location.pathname);setTimeout(()=>joinRoom(invite),200)}
 window.addEventListener('online',connect);window.addEventListener('pageshow',resumeApp);document.addEventListener('visibilitychange',resumeApp);window.addEventListener('offline',networkStatus);window.addEventListener('storage',e=>{if(e.key===STORAGE&&e.newValue){try{merge(JSON.parse(e.newValue).rooms[syncCode])}catch(e){}}});}
 function switchStore(s){if(storeRoutes[s]){activeStore=s;persist();renderStoreButtons();render();status('Laufweg: '+s)}}
-function renderStoreButtons(){const box=$('store-buttons-container');box.replaceChildren();for(const s of Object.keys(storeRoutes)){const b=button(s,()=>switchStore(s),'btn-store'+(s===activeStore?' active':''));b.setAttribute('aria-pressed',s===activeStore);box.append(b)}}
+function renderStoreButtons(){const box=$('store-buttons-container');box.replaceChildren();for(const s of orderedStores()){const b=button(s,()=>switchStore(s),'btn-store'+(s===activeStore?' active':''));b.setAttribute('aria-pressed',s===activeStore);box.append(b)}}
 function button(text,fn,cls='btn-action-icon',title=text){const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=text;b.onclick=fn;b.title=title;b.setAttribute('aria-label',title);return b}
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
@@ -476,7 +488,7 @@ function openEditor(item) {
   }
   for (const [label, field, values, value] of [
     ['Kategorie', 'category', [...new Set(Object.values(storeRoutes).flat())], item.category],
-    ['Supermarkt', 'targetStore', ['', ...Object.keys(storeRoutes)], item.targetStore || '']
+    ['Supermarkt', 'targetStore', ['', ...orderedStores()], item.targetStore || '']
   ]) {
     const wrapper = text('label', label);
     const select = document.createElement('select');
@@ -595,10 +607,46 @@ function deleteCategory(cat){if(!confirm('Kategorie löschen? Zugehörige Artike
 function addNewCategory(){const name=$('new-category-input').value.trim();if(!name||name.length>80)return;flushRoute();for(const s of Object.keys(storeRoutes))if(!storeRoutes[s].includes(name))storeRoutes[s].splice(Math.max(0,storeRoutes[s].length-1),0,name);$('new-category-input').value='';broadcastState();renderRouteList();render()}
 function openStoreManagerModal(){renderStoreManagerList();$('store-manager-modal').style.display='flex'}
 function closeStoreManagerModal(){$('store-manager-modal').style.display='none'}
-function renderStoreManagerList(){$('store-list-container').replaceChildren();for(const s of Object.keys(storeRoutes)){const li=text('li','','drag-item');li.append(text('strong',s),button('✎',()=>renameStore(s),'btn-action-icon','Markt umbenennen'),button('×',()=>deleteStore(s),'btn-action-icon danger','Markt löschen'));$('store-list-container').append(li)}}
-function renameStore(old){const name=prompt('Neuer Marktname:',old)?.trim();if(!name||name===old)return;if(name.length>80||Object.keys(storeRoutes).some(s=>norm(s)===norm(name))){alert('Marktname existiert bereits oder ist zu lang.');return}storeRoutes[name]=storeRoutes[old];delete storeRoutes[old];for(const i of items)if(i.targetStore===old)i.targetStore=name;if(activeStore===old)activeStore=name;broadcastState();renderStoreManagerList();renderStoreButtons();render()}
+function moveStore(name, direction) {
+  const names = orderedStores();
+  const from = names.indexOf(name);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= names.length) return;
+  [names[from], names[to]] = [names[to], names[from]];
+  put(storeOrderRecord, names);
+  broadcastState();
+  renderStoreButtons();
+  renderStoreManagerList(name, direction);
+}
+
+function renderStoreManagerList(focusName, direction) {
+  const list = $('store-list-container');
+  list.replaceChildren();
+  const names = orderedStores();
+  names.forEach((name, index) => {
+    const row = text('li', '', 'drag-item');
+    const actions = text('div', '', 'store-order-actions');
+    const up = button('↑', () => moveStore(name, -1), 'btn-action-icon', name + ' nach oben verschieben');
+    const down = button('↓', () => moveStore(name, 1), 'btn-action-icon', name + ' nach unten verschieben');
+    up.disabled = index === 0;
+    down.disabled = index === names.length - 1;
+    actions.append(
+      up, down,
+      button('✎', () => renameStore(name), 'btn-action-icon', name + ' umbenennen'),
+      button('×', () => deleteStore(name), 'btn-action-icon danger', name + ' löschen')
+    );
+    row.append(text('strong', name), actions);
+    list.append(row);
+    if (name === focusName) {
+      const preferred = direction < 0 ? up : down;
+      const alternate = direction < 0 ? down : up;
+      (preferred.disabled ? alternate : preferred).focus();
+    }
+  });
+}
+function renameStore(old){const name=prompt('Neuer Marktname:',old)?.trim();if(!name||name===old)return;if(name.length>80||Object.keys(storeRoutes).some(s=>norm(s)===norm(name))){alert('Marktname existiert bereits oder ist zu lang.');return}const order=orderedStores().map(store=>store===old?name:store);storeRoutes[name]=storeRoutes[old];delete storeRoutes[old];put(storeOrderRecord,order);for(const i of items)if(i.targetStore===old)i.targetStore=name;if(activeStore===old)activeStore=name;broadcastState();renderStoreManagerList();renderStoreButtons();render()}
 function addNewStore(){const name=$('new-store-input').value.trim();if(!name||name.length>80)return;if(Object.keys(storeRoutes).some(s=>norm(s)===norm(name))){alert('Diesen Markt gibt es bereits.');return}storeRoutes[name]=[...storeRoutes[activeStore]];activeStore=name;$('new-store-input').value='';broadcastState();renderStoreManagerList();renderStoreButtons();render()}
-function deleteStore(s){if(Object.keys(storeRoutes).length===1){alert('Mindestens ein Markt bleibt bestehen.');return}if(!confirm('Markt „'+s+'“ löschen?'))return;delete storeRoutes[s];for(const i of items)if(i.targetStore===s)i.targetStore=null;if(activeStore===s)activeStore=Object.keys(storeRoutes)[0];broadcastState();renderStoreManagerList();renderStoreButtons();render()}
+function deleteStore(s){if(Object.keys(storeRoutes).length===1){alert('Mindestens ein Markt bleibt bestehen.');return}if(!confirm('Markt „'+s+'“ löschen?'))return;delete storeRoutes[s];for(const i of items)if(i.targetStore===s)i.targetStore=null;if(activeStore===s)activeStore=orderedStores()[0];broadcastState();renderStoreManagerList();renderStoreButtons();render()}
 async function shareList(){await restoreLegacyPairing();const url=location.origin+location.pathname+'#join='+encodeURIComponent(syncCode);try{await navigator.clipboard.writeText(url);status('Geheimer Verknüpfungslink kopiert. Nur mit vertrauten Personen teilen.')}catch(e){prompt('Diesen geheimen Link kopieren:',url)}}
 function openSyncModal(){networkStatus();$('sync-current-code').value=syncCode;$('sync-code-input').value='';$('sync-modal').style.display='flex'}
 function closeSyncModal(){$('sync-modal').style.display='none'}

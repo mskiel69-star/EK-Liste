@@ -348,6 +348,11 @@ body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-ar
 .picture-editor button:disabled{opacity:.5}
 .picture-message{margin:6px 0 0;font-size:.85rem;color:#285c45}
 .picture-message:empty{display:none}
+</style><style>
+#store-list-container .drag-item{gap:8px}
+#store-list-container strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.store-order-actions{display:flex;gap:4px;flex-shrink:0}
+.store-order-actions button:disabled{opacity:.35;cursor:default}
 </style></head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
@@ -419,7 +424,7 @@ body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-ar
   <div class="modal-overlay" id="store-manager-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Supermärkte verwalten</h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Vorhandene Märkte:</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Mit ↑ und ↓ änderst du die Reihenfolge der Marktbuttons oben in der App.</p>
       <ul class="drag-list" id="store-list-container"></ul>
 
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">
