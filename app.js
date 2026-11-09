@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.4';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.5';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -171,13 +171,101 @@ function articleCategory(item) {
   return typeof item.category === 'string' && item.category.trim() ? item.category : 'Sonstiges';
 }
 
-function routeCategories(store) {
-  const saved = (storeRoutes[store] || []).filter(category => typeof category === 'string' && category.trim());
-  const extra = [...new Set(items.map(articleCategory))].filter(category => !saved.includes(category));
+const fruitPictures = new Set([
+  '🥭', 'papaya', '🍎', '🍏', '🍐', '🍌', '🍍', '🍊', '🍋', '🍋‍🟩', '🥝', '🥥',
+  '🍇', '🍉', '🍈', '🍑', 'plum', '🍒', '🍓', '🫐', 'fig', '🌴', 'dragonfruit', 'passionfruit', 'tropical'
+]);
+const vegetablePictures = new Set([
+  '🥑', '🍅', '🥒', '🍆', '🫑', '🌶️', '🥕', '🥔', '🍠', '🫜', '🥬',
+  '🥦', '🌽', '🧅', '🧄', '🍄‍🟫', '🫛', '🌿', '🫚', '🎃'
+]);
+const breadPictures = new Set(['🍞', '🥖', '🥐', '🥨', '🥯', '🫓']);
+
+function catalogCategory(title) {
+  const picture = productPictureFor(title);
+  if (fruitPictures.has(picture)) return 'Obst';
+  if (vegetablePictures.has(picture)) return 'Gemüse';
+  if (breadPictures.has(picture)) return 'Brot';
+  return null;
+}
+
+function categoryForTitle(title) {
+  return categoryDict[norm(title)] || catalogCategory(title) || 'Sonstiges';
+}
+
+function routeCategoryKey(label) {
+  const key = productPictureWords(label).filter(word => word !== 'und').join(' ');
+  if (['gemuese obst', 'obst gemuese', 'frisches obst frisches gemuese', 'frisches obst gemuese', 'obst frisches gemuese', 'gemuese frisches obst'].includes(key)) return 'obst gemuese';
+  if (['brot backwaren', 'backwaren brot', 'backwaren', 'baeckerei', 'brot broetchen', 'broetchen brot'].includes(key)) return 'brot';
+  if (key === 'frisches obst') return 'obst';
+  if (key === 'frisches gemuese') return 'gemuese';
+  return key;
+}
+
+function savedRoute(store) {
+  return (storeRoutes[store] || []).filter(category => typeof category === 'string' && category.trim());
+}
+
+function categoryOnRoute(item, route) {
+  let category = articleCategory(item);
+  if (category === 'Sonstiges' && !item.categoryManual) {
+    const learned = categoryDict[norm(item.title)];
+    category = learned || catalogCategory(item.title) || category;
+  }
+
+  const key = routeCategoryKey(category);
+  const find = key => route.find(label => routeCategoryKey(label) === key);
+  if (['obst', 'gemuese', 'obst gemuese'].includes(key)) {
+    const combined = find('obst gemuese');
+    if (combined) return combined;
+    const fruit = find('obst');
+    const vegetables = find('gemuese');
+    if (fruit && (key === 'obst' || (!item.categoryManual && catalogCategory(item.title) === 'Obst'))) return fruit;
+    // The original "Gemüse" route also covered fruit.
+    if (vegetables) return vegetables;
+  }
+  if (route.includes(category)) return category;
+  return find(key) || route.find(label => label.split(/\s+und\s+|[&/+]/i)
+    .some(part => routeCategoryKey(part) === key)) || category;
+}
+
+function routeCategories(store, categories) {
+  const saved = savedRoute(store);
+  const extra = [...new Set(categories || items.map(item => categoryOnRoute(item, saved)))]
+    .filter(category => !saved.includes(category));
   extra.sort((a, b) => a.localeCompare(b, 'de') || (a < b ? -1 : a > b ? 1 : 0));
   return [...new Set([...saved, ...extra])];
 }
-function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=routeCategories(activeStore);if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>articleCategory(i)===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions();refreshRouteEditor()}
+
+function render() {
+  const active = items.filter(item => !item.done || pending.has(item.id));
+  const done = items.filter(item => item.done && !pending.has(item.id));
+  $('count').textContent = active.length + ' Artikel';
+  $('done-counter').textContent = 'Erledigte Artikel (' + done.length + ')';
+  const box = $('list-container');
+  box.replaceChildren();
+
+  const saved = savedRoute(activeStore);
+  const groups = new Map();
+  for (const item of active) {
+    const category = categoryOnRoute(item, saved);
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(item);
+  }
+  if (!active.length) box.append(text('div', 'Alles bereit für deinen Einkauf.\\nTippe oder sprich deine ersten Artikel.', 'empty'));
+  for (const category of routeCategories(activeStore, groups.keys())) {
+    const list = groups.get(category);
+    if (!list) continue;
+    const block = text('section', '', 'cat-block');
+    block.append(text('div', category + ' · ' + list.length, 'cat-header'));
+    for (const item of list) block.append(itemRow(item));
+    box.append(block);
+  }
+  $('done-list').replaceChildren();
+  for (const item of done.sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))) $('done-list').append(itemRow(item, true));
+  renderSuggestions();
+  refreshRouteEditor();
+}
 
 const itemImageLimit = 8000;
 const listImageLimit = 550000;
@@ -294,7 +382,7 @@ let note='', name=seg;const price=seg.match(/(?:\s+(?:zu|für))?\s+(\d+(?:[.,]\d
 const quantity=name.match(/^(\d+(?:[.,]\d+)?\s*(?:kg|g|liter|l|stück|packungen?|flaschen?|dosen?)?)\s+(.+)$/i);if(quantity){name=quantity[2];note=[quantity[1],note].filter(Boolean).join(' · ')}
 const known=Object.keys(categoryDict).sort((a,b)=>b.length-a.length).find(k=>norm(name)===k||norm(name).startsWith(k+' '));if(known&&norm(name)!==known){note=[name.slice(known.length).trim(),note].filter(Boolean).join(' · ');name=name.slice(0,known.length)}
 // Unbekannte mehrteilige Artikelnamen bleiben vollständig erhalten.
-name=name.trim();if(!name||name.length>200||/^(noch|bitte|und|für|zu)$/i.test(name))continue;out.push({title:name.charAt(0).toUpperCase()+name.slice(1),note:note.slice(0,200),category:categoryDict[norm(name)]||'Sonstiges',targetStore})}return out}
+name=name.trim();if(!name||name.length>200||/^(noch|bitte|und|für|zu)$/i.test(name))continue;out.push({title:name.charAt(0).toUpperCase()+name.slice(1),note:note.slice(0,200),category:categoryForTitle(name),targetStore})}return out}
 function parseAndAdd(raw){const parsed=parseText(raw);for(const p of parsed){
  const existing=items.find(i=>itemKey(i)===itemKey(p));
  if(existing){pending.delete(existing.id);existing.done=false;existing.completedAt=null;if(p.targetStore)existing.targetStore=p.targetStore}
@@ -389,7 +477,7 @@ function applyRecipeIngredients(ingredients) {
       done.recipeQuantity = ingredient.recipeQuantity;
     } else {
       items.push({...ingredient, id: uuid(), done: false, completedAt: null,
-        category: categoryDict[norm(ingredient.title)] || 'Sonstiges', targetStore: null});
+        category: categoryForTitle(ingredient.title), targetStore: null});
     }
     added++;
   }
@@ -497,8 +585,9 @@ function openEditor(item) {
     form.append(wrapper);
     fields[field] = input;
   }
+  const displayedCategory = categoryOnRoute(item, savedRoute(activeStore));
   for (const [label, field, values, value] of [
-    ['Kategorie', 'category', [...new Set(Object.values(storeRoutes).flat())], item.category],
+    ['Kategorie', 'category', [...new Set(Object.values(storeRoutes).flat())], displayedCategory],
     ['Supermarkt', 'targetStore', ['', ...orderedStores()], item.targetStore || '']
   ]) {
     const wrapper = text('label', label);
@@ -592,9 +681,15 @@ function openEditor(item) {
         return;
       }
     }
-    for (const [field, input] of Object.entries(fields)) current[field] = input.value.trim();
+    for (const [field, input] of Object.entries(fields)) {
+      if (field !== 'category') current[field] = input.value.trim();
+    }
+    if (fields.category.value !== displayedCategory) {
+      current.category = fields.category.value;
+      current.categoryManual = true;
+      categoryDict[norm(current.title)] = current.category;
+    }
     if (imageChanged) current.image = draftImage;
-    categoryDict[norm(current.title)] = current.category;
     broadcastState();
     render();
     closeNoteModal();
