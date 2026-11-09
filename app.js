@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.2';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.3';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -166,7 +166,18 @@ function renderStoreButtons(){const box=$('store-buttons-container');box.replace
 function button(text,fn,cls='btn-action-icon',title=text){const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=text;b.onclick=fn;b.title=title;b.setAttribute('aria-label',title);return b}
 function text(tag,value,cls){const el=document.createElement(tag);el.textContent=value;el.className=cls||'';return el}
 const pending=new Map();
-function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=[...new Set([...(storeRoutes[activeStore]||[]),...active.map(i=>i.category)])];if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>i.category===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions()}
+
+function articleCategory(item) {
+  return typeof item.category === 'string' && item.category.trim() ? item.category : 'Sonstiges';
+}
+
+function routeCategories(store) {
+  const saved = (storeRoutes[store] || []).filter(category => typeof category === 'string' && category.trim());
+  const extra = [...new Set(items.map(articleCategory))].filter(category => !saved.includes(category));
+  extra.sort((a, b) => a.localeCompare(b, 'de') || (a < b ? -1 : a > b ? 1 : 0));
+  return [...new Set([...saved, ...extra])];
+}
+function render(){const active=items.filter(i=>!i.done||pending.has(i.id)),done=items.filter(i=>i.done&&!pending.has(i.id));$('count').textContent=active.length+' Artikel';$('done-counter').textContent='Erledigte Artikel ('+done.length+')';const box=$('list-container');box.replaceChildren();const order=routeCategories(activeStore);if(!active.length)box.append(text('div','Alles bereit für deinen Einkauf.\nTippe oder sprich deine ersten Artikel.','empty'));for(const cat of order){const list=active.filter(i=>articleCategory(i)===cat);if(!list.length)continue;const block=text('section','','cat-block');block.append(text('div',cat+' · '+list.length,'cat-header'));for(const i of list)block.append(itemRow(i));box.append(block)}$('done-list').replaceChildren();for(const i of done.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0)))$('done-list').append(itemRow(i,true));renderSuggestions();refreshRouteEditor()}
 
 const itemImageLimit = 8000;
 const listImageLimit = 550000;
@@ -597,14 +608,59 @@ function toggleInfo(){const panel=$('info-panel');panel.hidden=!panel.hidden;$('
 function toggleDropdownMenu(e){e.stopPropagation();$('dropdown-menu').classList.toggle('show')}
 function closeDropdownIfClickedOutside(e){if(!e.target.closest('.menu-container'))$('dropdown-menu').classList.remove('show')}
 function handleMenuClick(fn){$('dropdown-menu').classList.remove('show');fn()}
-function openRouteModal(){$('route-store-title').textContent=activeStore;renderRouteList();$('route-modal').style.display='flex'}
-function renderRouteList(){const box=$('drag-container');box.replaceChildren();(storeRoutes[activeStore]||[]).forEach((cat,index)=>{const li=text('li','','drag-item');li.draggable=true;li.append(text('span','☰ '),text('span',cat,'cat-label-text'));const actions=text('div','');function move(delta){const rows=Array.from(box.children),at=rows.indexOf(li),to=at+delta;if(to<0||to>=rows.length)return;if(delta<0)box.insertBefore(li,rows[to]);else box.insertBefore(rows[to],li);li.querySelector('button').focus()}
+let routeEditor;
+function draftRoute() {
+  return [...$('drag-container').querySelectorAll('.cat-label-text')].map(e => e.textContent);
+}
+
+function refreshRouteEditor() {
+  if ($('route-modal').style.display !== 'flex' || !routeEditor) return;
+  if (activeStore !== routeEditor.store) {
+    $('route-modal').style.display = 'none';
+    return;
+  }
+  const pristine = JSON.stringify(draftRoute()) === routeEditor.displayed;
+  if (pristine && (JSON.stringify(storeRoutes[activeStore]) !== routeEditor.saved ||
+      JSON.stringify(routeCategories(activeStore)) !== routeEditor.displayed)) renderRouteList();
+}
+
+function openRouteModal(){renderRouteList();$('route-modal').style.display='flex'}
+function renderRouteList(){
+  const order = routeCategories(activeStore);
+  routeEditor = {store: activeStore, saved: JSON.stringify(storeRoutes[activeStore]), displayed: JSON.stringify(order)};
+  $('route-store-title').textContent = activeStore;
+  const box=$('drag-container');box.replaceChildren();order.forEach(cat=>{const li=text('li','','drag-item');li.draggable=true;li.append(text('span','☰ '),text('span',cat,'cat-label-text'));const actions=text('div','');function move(delta){const rows=Array.from(box.children),at=rows.indexOf(li),to=at+delta;if(to<0||to>=rows.length)return;if(delta<0)box.insertBefore(li,rows[to]);else box.insertBefore(rows[to],li);li.querySelector('button').focus()}
 actions.append(button('↑',()=>move(-1),'btn-action-icon',cat+' nach oben'),button('↓',()=>move(1),'btn-action-icon',cat+' nach unten'));if(cat!=='Sonstiges')actions.append(button('✎',()=>renameCategory(cat)),button('×',()=>deleteCategory(cat)));li.append(actions);li.ondragstart=e=>{dragSrcEl=li;e.dataTransfer.setData('text/plain',cat);li.classList.add('dragging')};li.ondragover=e=>e.preventDefault();li.ondrop=e=>{e.preventDefault();if(dragSrcEl&&dragSrcEl!==li){const rows=[...box.children];if(rows.indexOf(dragSrcEl)<rows.indexOf(li))box.insertBefore(dragSrcEl,li.nextSibling);else box.insertBefore(dragSrcEl,li)}};li.ondragend=()=>{li.classList.remove('dragging');dragSrcEl=null};box.append(li)})}
-function saveCustomRoute(){storeRoutes[activeStore]=[...$('drag-container').querySelectorAll('.cat-label-text')].map(e=>e.textContent);broadcastState();render();$('route-modal').style.display='none'}
-function flushRoute(){storeRoutes[activeStore]=[...$('drag-container').querySelectorAll('.cat-label-text')].map(e=>e.textContent)}
-function renameCategory(old){flushRoute();const name=prompt('Neuer Name der Kategorie:',old)?.trim();if(!name||name===old)return;if(name.length>80||Object.values(storeRoutes).some(r=>r.includes(name))){alert('Dieser Name ist bereits vergeben oder zu lang.');return}for(const s of Object.keys(storeRoutes))storeRoutes[s]=storeRoutes[s].map(c=>c===old?name:c);for(const i of items)if(i.category===old)i.category=name;for(const k of Object.keys(categoryDict))if(categoryDict[k]===old)categoryDict[k]=name;broadcastState();renderRouteList();render()}
-function deleteCategory(cat){if(!confirm('Kategorie löschen? Zugehörige Artikel werden unter Sonstiges eingeordnet.'))return;flushRoute();for(const s of Object.keys(storeRoutes))storeRoutes[s]=storeRoutes[s].filter(c=>c!==cat);for(const i of items)if(i.category===cat)i.category='Sonstiges';for(const k of Object.keys(categoryDict))if(categoryDict[k]===cat)categoryDict[k]='Sonstiges';broadcastState();renderRouteList();render()}
-function addNewCategory(){const name=$('new-category-input').value.trim();if(!name||name.length>80)return;flushRoute();for(const s of Object.keys(storeRoutes))if(!storeRoutes[s].includes(name))storeRoutes[s].splice(Math.max(0,storeRoutes[s].length-1),0,name);$('new-category-input').value='';broadcastState();renderRouteList();render()}
+function saveCustomRoute(){
+  if (!flushRoute()) return;
+  $('route-modal').style.display='none';
+  broadcastState();
+  render();
+}
+
+function flushRoute() {
+  if (routeEditor?.store !== activeStore || routeEditor.saved !== JSON.stringify(storeRoutes[activeStore])) {
+    alert('Der Laufweg wurde inzwischen geändert. Die aktuelle Reihenfolge wird angezeigt. Bitte verschiebe die Kategorien erneut.');
+    renderRouteList();
+    return false;
+  }
+  const current = routeCategories(activeStore);
+  const draft = draftRoute().filter(category => current.includes(category));
+  const order = [...new Set([...draft, ...current])];
+  if (order.length > 100) {
+    alert('Ein Laufweg kann höchstens 100 Kategorien enthalten.');
+    return false;
+  }
+  if (order.some(category => category.length > 80)) {
+    alert('Kategorienamen dürfen höchstens 80 Zeichen lang sein. Bitte kürze den Namen in der Artikelbearbeitung.');
+    return false;
+  }
+  if (order.length) storeRoutes[activeStore] = order;
+  return true;
+}
+function renameCategory(old){const name=prompt('Neuer Name der Kategorie:',old)?.trim();if(!name||name===old)return;if(name.length>80||Object.values(storeRoutes).some(r=>r.includes(name))){alert('Dieser Name ist bereits vergeben oder zu lang.');return}if(!flushRoute())return;for(const s of Object.keys(storeRoutes))storeRoutes[s]=storeRoutes[s].map(c=>c===old?name:c);for(const i of items)if(articleCategory(i)===old)i.category=name;for(const k of Object.keys(categoryDict))if(categoryDict[k]===old)categoryDict[k]=name;broadcastState();renderRouteList();render()}
+function deleteCategory(cat){if(!confirm('Kategorie löschen? Zugehörige Artikel werden unter Sonstiges eingeordnet.')||!flushRoute())return;for(const s of Object.keys(storeRoutes))storeRoutes[s]=storeRoutes[s].filter(c=>c!==cat);for(const i of items)if(i.category===cat)i.category='Sonstiges';for(const k of Object.keys(categoryDict))if(categoryDict[k]===cat)categoryDict[k]='Sonstiges';broadcastState();renderRouteList();render()}
+function addNewCategory(){const name=$('new-category-input').value.trim();if(!name||name.length>80||!flushRoute())return;for(const s of Object.keys(storeRoutes))if(!storeRoutes[s].includes(name))storeRoutes[s].splice(Math.max(0,storeRoutes[s].length-1),0,name);$('new-category-input').value='';broadcastState();renderRouteList();render()}
 function openStoreManagerModal(){renderStoreManagerList();$('store-manager-modal').style.display='flex'}
 function closeStoreManagerModal(){$('store-manager-modal').style.display='none'}
 function moveStore(name, direction) {
