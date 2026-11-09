@@ -353,6 +353,15 @@ body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-ar
 #store-list-container strong{flex:1;min-width:0;overflow-wrap:anywhere}
 .store-order-actions{display:flex;gap:4px;flex-shrink:0}
 .store-order-actions button:disabled{opacity:.35;cursor:default}
+#drag-container .drag-item{gap:7px;padding:4px 6px;margin-bottom:5px}
+#drag-container .cat-label-text{flex:1;min-width:0;overflow-wrap:anywhere}
+#drag-container .route-grip{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:6px;background:#e5ebdf;color:#345541;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#drag-container .dragging{opacity:1;background:#e5ebdf;border-color:#6b8b77}
+#drag-container .dragging .route-grip{cursor:grabbing}
+#drag-container .route-actions{display:flex;gap:3px;flex-shrink:0}
+#drag-container .route-actions button{min-width:28px;min-height:30px;width:28px;height:30px;padding:0;font-size:.9rem}
+#route-modal .btn-add-compact{height:36px}
+#route-modal .btn-modal{width:auto;padding:8px 12px;font-size:.9rem}
 </style></head>
 <body onclick="closeDropdownIfClickedOutside(event)">
 
@@ -441,7 +450,7 @@ body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-ar
   <div class="modal-overlay" id="route-modal">
     <div class="modal">
       <h2 style="margin-top: 0;">Laufweg für <span id="route-store-title" style="color:#1a237e;"></span></h2>
-      <p style="font-size: 0.85rem; color: #546e7a;">Verschiebe die Kategorien mit ↑ und ↓ oder am Griff ☰. Nach dem Speichern folgt die Einkaufsliste diesem Laufweg und zeigt die Kategorien mit offenen Artikeln.</p>
+      <p style="font-size: 0.85rem; color: #546e7a;">Halte den Griff ☰ gedrückt und ziehe die Kategorie an ihre neue Stelle. Du kannst auch ↑ und ↓ nutzen. Übernimm die Reihenfolge mit „Speichern &amp; Schließen“.</p>
       <ul class="drag-list" id="drag-container"></ul>
 
       <div style="margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px;">

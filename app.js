@@ -22,10 +22,10 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.3';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.4';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
-let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,dragSrcEl=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
+let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
 function status(t){$('mic-status').textContent=t}
 function persist(){try{db.rooms[syncCode]=records;db.room=syncCode;db.activeStore=activeStore;localStorage.setItem(STORAGE,JSON.stringify(db));return true}catch(e){status('Speichern fehlgeschlagen! Bitte Sicherung exportieren.');$('app-state').textContent='Achtung: Änderungen können momentan nicht dauerhaft gespeichert werden.';return false}}
 function stamp(){clock=Math.max(Date.now(),clock+1);return [clock,client]}
@@ -625,13 +625,105 @@ function refreshRouteEditor() {
 }
 
 function openRouteModal(){renderRouteList();$('route-modal').style.display='flex'}
-function renderRouteList(){
+let routeDrag;
+
+function finishRouteDrag(cancel = false) {
+  if (!routeDrag) return;
+  const {box, row, next, pointer, frame} = routeDrag;
+  routeDrag = null;
+  cancelAnimationFrame(frame);
+  row.classList.remove('dragging');
+  if (cancel && row.parentNode === box && (!next || next.parentNode === box)) box.insertBefore(row, next);
+  if (box.hasPointerCapture(pointer)) box.releasePointerCapture(pointer);
+}
+
+function positionRouteRow({box, row, y}) {
+  const before = [...box.children].find(candidate => {
+    if (candidate === row) return false;
+    const rect = candidate.getBoundingClientRect();
+    return y < rect.top + rect.height / 2;
+  }) || null;
+  if (before !== row.nextElementSibling) box.insertBefore(row, before);
+}
+
+function scrollRouteWhileDragging() {
+  const drag = routeDrag;
+  if (!drag) return;
+  if ($('route-modal').style.display !== 'flex') {
+    finishRouteDrag(true);
+    return;
+  }
+  const {scroll, y} = drag;
+  const {top, bottom} = scroll.getBoundingClientRect();
+  const margin = 42;
+  const distance = y < top + margin ? y - top - margin : Math.max(0, y - bottom + margin);
+  if (distance) {
+    const previous = scroll.scrollTop;
+    scroll.scrollTop += Math.max(-16, Math.min(16, distance / 3));
+    if (scroll.scrollTop !== previous) positionRouteRow(drag);
+  }
+  drag.frame = requestAnimationFrame(scrollRouteWhileDragging);
+}
+
+function renderRouteList() {
+  finishRouteDrag(true);
   const order = routeCategories(activeStore);
   routeEditor = {store: activeStore, saved: JSON.stringify(storeRoutes[activeStore]), displayed: JSON.stringify(order)};
   $('route-store-title').textContent = activeStore;
-  const box=$('drag-container');box.replaceChildren();order.forEach(cat=>{const li=text('li','','drag-item');li.draggable=true;li.append(text('span','☰ '),text('span',cat,'cat-label-text'));const actions=text('div','');function move(delta){const rows=Array.from(box.children),at=rows.indexOf(li),to=at+delta;if(to<0||to>=rows.length)return;if(delta<0)box.insertBefore(li,rows[to]);else box.insertBefore(rows[to],li);li.querySelector('button').focus()}
-actions.append(button('↑',()=>move(-1),'btn-action-icon',cat+' nach oben'),button('↓',()=>move(1),'btn-action-icon',cat+' nach unten'));if(cat!=='Sonstiges')actions.append(button('✎',()=>renameCategory(cat)),button('×',()=>deleteCategory(cat)));li.append(actions);li.ondragstart=e=>{dragSrcEl=li;e.dataTransfer.setData('text/plain',cat);li.classList.add('dragging')};li.ondragover=e=>e.preventDefault();li.ondrop=e=>{e.preventDefault();if(dragSrcEl&&dragSrcEl!==li){const rows=[...box.children];if(rows.indexOf(dragSrcEl)<rows.indexOf(li))box.insertBefore(dragSrcEl,li.nextSibling);else box.insertBefore(dragSrcEl,li)}};li.ondragend=()=>{li.classList.remove('dragging');dragSrcEl=null};box.append(li)})}
+  const box = $('drag-container');
+  box.replaceChildren();
+  box.onpointermove = e => {
+    const drag = routeDrag;
+    if (drag?.pointer !== e.pointerId) return;
+    if (!drag.active) {
+      if (Math.abs(e.clientY - drag.startY) < 5) return;
+      drag.active = true;
+      drag.row.classList.add('dragging');
+      drag.frame = requestAnimationFrame(scrollRouteWhileDragging);
+    }
+    drag.y = e.clientY;
+    positionRouteRow(drag);
+  };
+  box.onpointerup = e => { if (routeDrag?.pointer === e.pointerId) finishRouteDrag(); };
+  box.onpointercancel = box.onlostpointercapture = e => {
+    if (routeDrag?.pointer === e.pointerId) finishRouteDrag(true);
+  };
+  for (const cat of order) {
+    const row = text('li', '', 'drag-item');
+    const grip = text('span', '☰', 'route-grip');
+    grip.setAttribute('aria-hidden', 'true');
+    grip.oncontextmenu = e => e.preventDefault();
+    grip.onpointerdown = e => {
+      if (e.button !== 0 || routeDrag) return;
+      e.preventDefault();
+      box.setPointerCapture(e.pointerId);
+      routeDrag = {
+        box, row, next: row.nextElementSibling, pointer: e.pointerId,
+        startY: e.clientY, y: e.clientY, scroll: box.closest('.modal'),
+        active: false, frame: 0
+      };
+    };
+    const actions = text('div', '', 'route-actions');
+    function move(direction, control) {
+      const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+      if (sibling) {
+        box.insertBefore(row, direction < 0 ? sibling : sibling.nextElementSibling);
+        control.focus();
+      }
+    }
+    const up = button('↑', () => move(-1, up), 'btn-action-icon', cat + ' nach oben');
+    const down = button('↓', () => move(1, down), 'btn-action-icon', cat + ' nach unten');
+    actions.append(up, down);
+    if (cat !== 'Sonstiges') actions.append(
+      button('✎', () => renameCategory(cat), 'btn-action-icon', cat + ' umbenennen'),
+      button('×', () => deleteCategory(cat), 'btn-action-icon danger', cat + ' löschen')
+    );
+    row.append(grip, text('span', cat, 'cat-label-text'), actions);
+    box.append(row);
+  }
+}
 function saveCustomRoute(){
+  finishRouteDrag();
   if (!flushRoute()) return;
   $('route-modal').style.display='none';
   broadcastState();
