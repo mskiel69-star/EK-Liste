@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.6';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.7';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -186,6 +186,7 @@ function catalogCategory(title) {
   if (fruitPictures.has(picture)) return 'Obst';
   if (vegetablePictures.has(picture)) return 'Gemüse';
   if (breadPictures.has(picture)) return 'Brot';
+  if (['🥩', '🍗', '🥓', '🌭'].includes(picture)) return 'Fleisch und Wurst';
   return null;
 }
 
@@ -372,11 +373,22 @@ function toggleItemDirect(id){const i=items.find(i=>i.id===id);if(i){i.done=!i.d
 function safeDeleteItem(id){const i=items.find(i=>i.id===id);if(i&&confirm('„'+i.title+'“ wirklich löschen?')){items=items.filter(i=>i.id!==id);pending.delete(id);broadcastState();render()}}
 function resetAllData(){if(confirm('Alle Artikel dieser verknüpften Liste löschen? Dies wird auch auf andere Geräte übertragen.')){items=[];pending.clear();broadcastState();render()}}
 function toggleDoneSection(){const e=$('done-list');e.style.display=e.style.display==='none'?'block':'none';$('done-arrow').textContent=e.style.display==='none'?'▼':'▲'}
-function parseText(raw, executeCommands = true){let t=raw.trim().replace(/[.!?]+$/,'');if(!t)return [];for(const s of Object.keys(storeRoutes)){if([norm(s),'zu '+norm(s),'bei '+norm(s),'wechsel zu '+norm(s)].includes(norm(t))){if(executeCommands)switchStore(s);return []}}
+const spokenWeekendContext = /(^|\s)(?:für\s+(?:das(?:\s+(?:nächste|kommende))?|dieses|nächstes|kommendes)|fürs|übers|über\s+das|am|zum|bis(?:\s+zum)?)\s+wochenende(?=\s|[.!?,;:]|$)/giu;
+const spokenDayContext = /(^|\s)(?:(?:für|bis)\s+(?:heute(?:\s+abend)?|morgen(?:\s+früh)?|übermorgen|(?:nächste|kommende)\s+woche)|(?:für|am|bis(?:\s+zum)?)\s+(?:(?:nächsten|kommenden)\s+)?(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)|heute\s+abend|morgen\s+früh)(?=\s|[.!?,;:]|$)/giu;
+
+function stripSpokenContext(segment) {
+  return segment.replace(spokenWeekendContext, ' ')
+    .replace(spokenDayContext, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[.!?,;:\s]+|[.!?,;:\s]+$/g, '')
+    .replace(/^(?:(?:brauche|benötige|möchte) ich|(?:brauchen|benötigen|möchten) wir|hätte ich gern(?:e)?|ich benötige|wir benötigen)(?:\s+noch)?(?:\s+|$)/i, '');
+}
+
+function parseText(raw, executeCommands = true, spoken = false){let t=raw.trim().replace(/[.!?]+$/,'');if(!t)return [];for(const s of Object.keys(storeRoutes)){if([norm(s),'zu '+norm(s),'bei '+norm(s),'wechsel zu '+norm(s)].includes(norm(t))){if(executeCommands)switchStore(s);return []}}
 if(/^(stopp?|aufnahme beenden)$/i.test(t)){if(executeCommands)stopVoice();return []}
 t=t.replace(/\b(ich brauche noch|wir brauchen noch|ich brauche|wir brauchen|ich möchte|wir möchten|kauf bitte|kaufe bitte|bring bitte mit|bring mit|besorge bitte)\b/gi,' ').replace(/\b(packe|pack|schreib|schreibe|setze|setz|tu)\s+(bitte\s+)?/gi,' ').replace(/\b(in die einkaufsliste|auf die einkaufsliste|auf die liste|in die liste|zur liste|dazu|bitte)\b/gi,' ').trim();
 const segments=t.split(/\s+(?:und|sowie|außerdem|dann noch)\s+|;\s*|,\s*(?!\d)/i), out=[];
-for(let seg of segments){let targetStore=null;for(const s of Object.keys(storeRoutes)){const escaped=s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');const re=new RegExp('(?:^|\\s)(?:(?:nur bei|bei|im|für)\\s+)?'+escaped+'(?=\\s|$)','i');if(re.test(seg)){targetStore=s;seg=seg.replace(re,' ').trim();break}}
+for(let seg of segments){if(spoken)seg=stripSpokenContext(seg);let targetStore=null;for(const s of Object.keys(storeRoutes)){const escaped=s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');const re=new RegExp('(?:^|\\s)(?:(?:nur bei|bei|im|für)\\s+)?'+escaped+'(?=\\s|$)','i');if(re.test(seg)){targetStore=s;seg=seg.replace(re,' ').trim();break}}
 seg=seg.replace(/^(?:noch|etwas|den|die|das|ein|eine|einen)\s+/i,'').trim();if(!seg)continue;
 let note='', name=seg;const price=seg.match(/(?:\s+(?:zu|für))?\s+(\d+(?:[.,]\d{1,2})?)(?:\s*(€|euro|cent|ct))?\s*$/i);if(price){note=price[1].replace('.',',')+(price[2]?' '+price[2]:'');name=seg.slice(0,price.index).trim()}
 const quantity=name.match(/^(\d+(?:[.,]\d+)?\s*(?:kg|g|liter|l|stück|packungen?|flaschen?|dosen?)?)\s+(.+)$/i);if(quantity){name=quantity[2];note=[quantity[1],note].filter(Boolean).join(' · ')}
@@ -387,9 +399,9 @@ function showEntryFeedback(message) {
   $('entry-feedback').textContent = message;
 }
 
-function parseAndAdd(raw) {
+function parseAndAdd(raw, spoken = false) {
   const previousStore = activeStore;
-  const parsed = parseText(raw);
+  const parsed = parseText(raw, true, spoken);
   if (!parsed.length) {
     if (/^(stopp?|aufnahme beenden)[.!?]*$/i.test(raw.trim())) return;
     const storeCommand = activeStore !== previousStore || [norm(activeStore), 'zu ' + norm(activeStore), 'bei ' + norm(activeStore), 'wechsel zu ' + norm(activeStore)].includes(norm(raw.replace(/[.!?]+$/, '')));
@@ -953,7 +965,7 @@ recognition.onresult = event => {
   }
   if (final.length) {
     lastFinal = final.join(', ');
-    parseAndAdd(lastFinal);
+    parseAndAdd(lastFinal, true);
   }
   const heard = interim.join(' ') || lastFinal;
   $('voice-transcript').textContent = heard ? (interim.length ? 'Ich höre: ' : 'Erkannt: ') + heard : '';
