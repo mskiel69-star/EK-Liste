@@ -338,6 +338,10 @@
 .item-row .item-info,.done-item .item-info{cursor:default;overflow-wrap:anywhere}
 #input-list-status:not(:empty){margin-top:6px;color:#b34700;font-size:1rem;font-weight:700;line-height:1.35;max-height:2.7em;overflow:auto;overflow-wrap:anywhere}
 body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-area-inset-bottom))}
+#voice-transcript:not(:empty),#entry-feedback:not(:empty){margin-top:5px;line-height:1.35;max-height:2.7em;overflow:auto;overflow-wrap:anywhere}
+#voice-transcript{color:#415f50;font-size:.85rem}
+#entry-feedback{color:#a23f00;font-weight:700;font-size:.95rem}
+body:has(#voice-transcript:not(:empty),#entry-feedback:not(:empty)){padding-bottom:calc(205px + env(safe-area-inset-bottom))}
 </style><style>
 .article-picture{display:grid;place-items:center;width:36px;height:36px;flex:0 0 36px;border-radius:9px;background:#edf1e8;font-size:1.25rem;overflow:hidden}
 .article-picture img{display:block;width:100%;height:100%;object-fit:cover}
@@ -426,7 +430,9 @@ body:has(#input-list-status:not(:empty)){padding-bottom:calc(155px + env(safe-ar
         <button class="btn-mic-icon-only" id="btn-mic" onclick="toggleVoice()" title="Spracheingabe starten / stoppen">🎙️</button>
       </div>
       <div id="input-list-status" role="status" aria-atomic="true"></div>
-      <div class="status-text" id="mic-status">Tastatureingabe funktioniert offline. Sprache je nach Browser.</div>
+      <div id="voice-transcript"></div>
+      <div id="entry-feedback" role="status" aria-atomic="true"></div>
+      <div class="status-text" id="mic-status" role="status">Tastatureingabe funktioniert offline. Sprache je nach Browser.</div>
     </div>
   </div>
 

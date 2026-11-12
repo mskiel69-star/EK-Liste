@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.5';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.6';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -75,7 +75,7 @@ function materialize(){deduplicateRecords();items=[];storeRoutes=Object.create(n
 function validText(s,n=200){return typeof s==='string'&&s.length<=n}
 function validRecord(id,r){if(!r||!Array.isArray(r.v)||!Number.isSafeInteger(r.v[0])||!validText(r.v[1],100))return false;if(r.data===null)return true;const d=r.data;if(id===storeOrderRecord)return Array.isArray(d)&&d.every(name=>validText(name,80)&&name.trim());if(id.startsWith('i:'))return d&&validText(d.id,100)&&id==='i:'+d.id&&validText(d.title)&&d.title.trim()&&validText(d.category)&&validText(d.note||'')&&validText(d.targetStore||'')&&typeof d.done==='boolean'&&validItemImage(d.image);if(id.startsWith('s:'))return validText(id.slice(2),80)&&Array.isArray(d)&&d.length>0&&d.length<=100&&d.every(c=>validText(c,80));if(id.startsWith('d:'))return validText(id,220)&&validText(d,80);return false}
 function merge(remote){if(!remote||typeof remote!=='object'||Object.keys(remote).length>10000)return false;let changed=false;for(const [id,r]of Object.entries(remote)){if(validRecord(id,r)&&newer(r,records[id])){records[id]=clone(r);clock=Math.max(clock,r.v[0]);changed=true}}if(changed){materialize();persist();renderStoreButtons();if($('store-manager-modal').style.display==='flex')renderStoreManagerList();render()}return changed}
-function broadcastState(){const desired={};if(Array.isArray(records[storeOrderRecord]?.data))desired[storeOrderRecord]=orderedStores();for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();if(persist())sendState()}
+function broadcastState(){const desired={};if(Array.isArray(records[storeOrderRecord]?.data))desired[storeOrderRecord]=orderedStores();for(const i of items)desired['i:'+i.id]=i;for(const [s,route]of Object.entries(storeRoutes))desired['s:'+s]=route;for(const [word,cat]of Object.entries(categoryDict))desired['d:'+word]=cat;for(const [id,d]of Object.entries(desired)){if(!records[id]||JSON.stringify(records[id].data)!==JSON.stringify(d))put(id,d)}for(const [id,r]of Object.entries(records))if(r.data!==null&&!(id in desired))put(id,null);syncRevision++;pendingSync=true;if(deduplicateRecords())materialize();const saved=persist();if(saved)sendState();return saved}
 const enc=new TextEncoder(),dec=new TextDecoder();
 function b64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -383,11 +383,42 @@ const quantity=name.match(/^(\d+(?:[.,]\d+)?\s*(?:kg|g|liter|l|stück|packungen?
 const known=Object.keys(categoryDict).sort((a,b)=>b.length-a.length).find(k=>norm(name)===k||norm(name).startsWith(k+' '));if(known&&norm(name)!==known){note=[name.slice(known.length).trim(),note].filter(Boolean).join(' · ');name=name.slice(0,known.length)}
 // Unbekannte mehrteilige Artikelnamen bleiben vollständig erhalten.
 name=name.trim();if(!name||name.length>200||/^(noch|bitte|und|für|zu)$/i.test(name))continue;out.push({title:name.charAt(0).toUpperCase()+name.slice(1),note:note.slice(0,200),category:categoryForTitle(name),targetStore})}return out}
-function parseAndAdd(raw){const parsed=parseText(raw);for(const p of parsed){
- const existing=items.find(i=>itemKey(i)===itemKey(p));
- if(existing){pending.delete(existing.id);existing.done=false;existing.completedAt=null;if(p.targetStore)existing.targetStore=p.targetStore}
- else items.push({...p,id:uuid(),done:false,completedAt:null});
- }if(parsed.length){broadcastState();render();status(parsed.length+' Artikel verarbeitet · lokal gespeichert.')}}
+function showEntryFeedback(message) {
+  $('entry-feedback').textContent = message;
+}
+
+function parseAndAdd(raw) {
+  const previousStore = activeStore;
+  const parsed = parseText(raw);
+  if (!parsed.length) {
+    if (/^(stopp?|aufnahme beenden)[.!?]*$/i.test(raw.trim())) return;
+    const storeCommand = activeStore !== previousStore || [norm(activeStore), 'zu ' + norm(activeStore), 'bei ' + norm(activeStore), 'wechsel zu ' + norm(activeStore)].includes(norm(raw.replace(/[.!?]+$/, '')));
+    showEntryFeedback(storeCommand ? 'Laufweg: ' + activeStore : 'Kein Artikel erkannt.');
+    return;
+  }
+
+  const outcomes = new Map();
+  for (const item of parsed) {
+    const key = itemKey(item);
+    const existing = items.find(entry => itemKey(entry) === key);
+    const label = [item.title, item.note].filter(Boolean).join(' · ');
+    if (!outcomes.has(key)) {
+      const message = !existing ? 'Hinzugefügt' : existing.done ? 'Wieder auf der Liste' : 'Bereits auf der Liste';
+      outcomes.set(key, message + ': ' + label);
+    }
+    if (existing) {
+      pending.delete(existing.id);
+      existing.done = false;
+      existing.completedAt = null;
+      if (item.targetStore) existing.targetStore = item.targetStore;
+    } else {
+      items.push({...item, id: uuid(), done: false, completedAt: null});
+    }
+  }
+  const saved = broadcastState();
+  render();
+  showEntryFeedback([...outcomes.values()].join(' | ') + (saved ? '' : ' · Speichern fehlgeschlagen.'));
+}
 
 const recipeAmountPattern = /^(?:\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?|[¼½¾])\s*(?:kg|g|mg|ml|cl|dl|l|liter|stk\.?|stück|el|tl|packungen?|dosen?|flaschen?|bund|becher)?$/iu;
 let recipeIngredients = [];
@@ -558,20 +589,31 @@ function renderSuggestions(){
   };box.append(b);
  }
 }
-function restoreCompleted(id){const i=items.find(i=>i.id===id);if(!i)return;pending.delete(id);i.done=false;i.completedAt=null;broadcastState();$('manual-input').value='';render();$('manual-input').focus();status(i.title+' wieder auf die Einkaufsliste gesetzt.')}
+function restoreCompleted(id){const i=items.find(i=>i.id===id);if(!i)return;pending.delete(id);i.done=false;i.completedAt=null;broadcastState();$('manual-input').value='';$('manual-input').blur();render();showEntryFeedback('Wieder auf der Liste: '+i.title)}
 function handleInputKey(e){
  if(e.isComposing||e.keyCode===229)return;
  if(e.key==='Enter'){e.preventDefault();addFromInput()}
  if(e.key==='ArrowDown'){const first=$('suggestions').querySelector('button');if(first&&!$('suggestions').hidden){e.preventDefault();first.focus()}}
  if(e.key==='Escape'){$('suggestions').hidden=true;$('manual-input').setAttribute('aria-expanded','false')}
 }
-function addFromInput(){const value=$('manual-input').value;if(value.trim()){parseAndAdd(value);$('manual-input').value='';renderSuggestions();$('manual-input').focus()}}
+function addFromInput() {
+  const input = $('manual-input');
+  const value = input.value.trim();
+  if (!value) return;
+  if (!keepRecording) $('voice-transcript').textContent = '';
+  parseAndAdd(value);
+  input.value = '';
+  input.blur();
+  renderSuggestions();
+}
 
 function openEditor(item) {
   editingItemId = editingNoteItemId = editingStoreItemId = item.id;
   const overlay = $('note-modal');
   const modal = overlay.querySelector('.modal');
-  modal.replaceChildren(text('h2', 'Artikel bearbeiten'));
+  const heading = text('h2', 'Artikel bearbeiten');
+  heading.tabIndex = -1;
+  modal.replaceChildren(heading);
   const form = document.createElement('form');
   const fields = {};
   for (const [label, field, value] of [['Artikel', 'title', item.title], ['Bemerkung / Preis', 'note', item.note || '']]) {
@@ -696,7 +738,7 @@ function openEditor(item) {
   };
   modal.append(form);
   overlay.style.display = 'flex';
-  fields.title.focus();
+  heading.focus();
 }
 function closeNoteModal(){$('note-modal').style.display='none'}
 function toggleInfo(){const panel=$('info-panel');panel.hidden=!panel.hidden;$('info-toggle').setAttribute('aria-expanded',String(!panel.hidden));if(panel.hidden)$('info-toggle').focus()}
@@ -719,7 +761,7 @@ function refreshRouteEditor() {
       JSON.stringify(routeCategories(activeStore)) !== routeEditor.displayed)) renderRouteList();
 }
 
-function openRouteModal(){renderRouteList();$('route-modal').style.display='flex'}
+function openRouteModal(){$('manual-input').blur();renderRouteList();$('route-modal').style.display='flex'}
 let routeDrag;
 
 function finishRouteDrag(cancel = false) {
@@ -897,18 +939,33 @@ function saveSyncCode(){let val=$('sync-code-input').value.trim();try{val=new UR
 function joinRoom(code){code=String(code||'').trim();if(!/^[a-zA-Z0-9_-]{24,150}$/.test(code)){alert('Bitte einen vollständigen Verknüpfungslink oder geheimen Code mit mindestens 24 Zeichen verwenden.');return}if(code===syncCode)return;if(!confirm('Mit dieser gemeinsamen Liste verbinden? Deine bisherige Liste bleibt getrennt auf diesem Gerät gespeichert.'))return;persist();db.legacySyncMigrated=true;db.joinedExplicitly=true;syncCode=code;records=clone(db.rooms[code]||{});pendingSync=true;pending.clear();materialize();persist();renderStoreButtons();render();connect()}
 function exportBackup(){persist();const blob=new Blob([JSON.stringify({schema:3,records},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Einkaufsliste-Sicherung-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000)}
 $('import-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>2000000)throw Error();const data=JSON.parse(await f.text());if(data.schema!==3||!data.records||!Object.entries(data.records).every(([id,r])=>validRecord(id,r)))throw Error();if(confirm('Sicherung in die aktuelle Liste übernehmen? Diese Änderungen werden mit verknüpften Geräten abgeglichen.')){for(const [id,r]of Object.entries(data.records))put(id,r.data);materialize();persist();renderStoreButtons();render();sendState()}}catch(e){alert('Diese Sicherung ist ungültig oder zu groß.')}finally{e.target.value=''}};
-function toggleVoice(){keepRecording?stopVoice():startVoice()}
-async function startVoice(){const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech){status('Dieser Browser unterstützt keine Spracherkennung. Nutze das Mikrofon deiner Bildschirmtastatur.');return}if(!navigator.onLine&&typeof Speech.available!=='function'){status('Offline-Sprache ist in diesem Browser nicht verfügbar. Bitte Tastatur oder Offline-Diktat des Geräts nutzen.');return}recognition=new Speech();recognition.lang='de-DE';recognition.interimResults=false;recognition.continuous=true;
+function toggleVoice(){$('manual-input').blur();keepRecording?stopVoice():startVoice()}
+async function startVoice(){const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech){status('Dieser Browser unterstützt keine Spracherkennung. Nutze das Mikrofon deiner Bildschirmtastatur.');return}if(!navigator.onLine&&typeof Speech.available!=='function'){status('Offline-Sprache ist in diesem Browser nicht verfügbar. Bitte Tastatur oder Offline-Diktat des Geräts nutzen.');return}recognition=new Speech();recognition.lang='de-DE';recognition.interimResults=true;recognition.continuous=true;
 if(!navigator.onLine){try{if(await Speech.available({langs:['de-DE'],processLocally:true})!=='available'){status('Kein deutsches Offline-Sprachpaket verfügbar. Bitte Tastatur verwenden.');return}recognition.processLocally=true}catch(e){status('Offline-Spracherkennung wird hier nicht unterstützt.');return}}
-recognition.onstart=()=>{keepRecording=true;$('btn-mic').classList.add('recording');$('btn-mic').textContent='⏹';$('btn-mic').setAttribute('aria-label','Aufnahme stoppen');status('Ich höre zu. Zum Beispiel: Ich brauche Tomaten, Brot und Milch.')};recognition.onresult=e=>{for(let n=e.resultIndex;n<e.results.length;n++)if(e.results[n].isFinal)parseAndAdd(e.results[n][0].transcript)};recognition.onerror=e=>{stopVoice();status(e.error==='not-allowed'?'Mikrofon nicht freigegeben. Bitte Browser-Berechtigung prüfen.':'Spracheingabe beendet ('+e.error+'). Tastatureingabe bleibt verfügbar.')};recognition.onend=()=>{keepRecording=false;resetMic()};try{recognition.start()}catch(e){stopVoice();status('Mikrofon konnte nicht gestartet werden.')}}
+recognition.onstart=()=>{$('manual-input').blur();showEntryFeedback('');$('voice-transcript').textContent='';keepRecording=true;$('btn-mic').classList.add('recording');$('btn-mic').textContent='⏹';$('btn-mic').setAttribute('aria-label','Aufnahme stoppen');status('Ich höre zu. Zum Beispiel: Ich brauche Tomaten, Brot und Milch.')};let lastFinal = '';
+recognition.onresult = event => {
+  const interim = [];
+  const final = [];
+  for (let index = event.resultIndex; index < event.results.length; index++) {
+    const result = event.results[index];
+    const transcript = result[0].transcript.trim();
+    if (transcript) (result.isFinal ? final : interim).push(transcript);
+  }
+  if (final.length) {
+    lastFinal = final.join(', ');
+    parseAndAdd(lastFinal);
+  }
+  const heard = interim.join(' ') || lastFinal;
+  $('voice-transcript').textContent = heard ? (interim.length ? 'Ich höre: ' : 'Erkannt: ') + heard : '';
+};recognition.onerror=e=>{stopVoice();status(e.error==='not-allowed'?'Mikrofon nicht freigegeben. Bitte Browser-Berechtigung prüfen.':'Spracheingabe beendet ('+e.error+'). Tastatureingabe bleibt verfügbar.')};recognition.onend=()=>{keepRecording=false;resetMic();$('voice-transcript').textContent=lastFinal?'Erkannt: '+lastFinal:'';if($('mic-status').textContent.startsWith('Ich höre zu.'))status(lastFinal?'Aufnahme beendet.':'Aufnahme beendet. Kein Artikel erkannt.')};try{recognition.start()}catch(e){stopVoice();status('Mikrofon konnte nicht gestartet werden.')}}
 function resetMic(){$('btn-mic').classList.remove('recording');$('btn-mic').textContent='🎙️';$('btn-mic').setAttribute('aria-label','Spracheingabe starten')}
-function stopVoice(){keepRecording=false;resetMic();try{recognition?.stop()}catch(e){}status('Aufnahme beendet. Deine Liste ist lokal gespeichert.')}
+function stopVoice(){keepRecording=false;resetMic();try{recognition?.stop()}catch(e){}status('Aufnahme beendet.')}
 async function setupPWA(){if(!('serviceWorker'in navigator)){status('Offline-Start wird von diesem Browser nicht unterstützt.');return}try{reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});const show=()=>{waitingWorker=reg.waiting;if(waitingWorker&&navigator.serviceWorker.controller)$('update').hidden=false};show();reg.addEventListener('updatefound',()=>{const w=reg.installing;w?.addEventListener('statechange',()=>{if(w.state==='installed'){show();if(!navigator.serviceWorker.controller)status('Offline-Dateien gespeichert. Die App kann jetzt offline geöffnet werden.')}})});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(sessionStorage.getItem('einkauf-updating')){sessionStorage.removeItem('einkauf-updating');location.reload()}});navigator.serviceWorker.ready.then(()=>{if(navigator.serviceWorker.controller)status('Offline bereit · Tastatur verfügbar, Sprache je nach Browser.');if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})});setInterval(()=>reg.update().catch(()=>{}),300000)}catch(e){$('app-state').textContent='Offline-Start konnte nicht eingerichtet werden. Bitte App über HTTPS öffnen.'}}
 async function checkUpdate(){if(!navigator.onLine){status('Du bist offline. Updates können später geprüft werden.');return}try{await reg?.update();if(reg?.waiting){waitingWorker=reg.waiting;$('update').hidden=false}else status('Update-Prüfung gestartet. Ein verfügbares Update wird zur Bestätigung angezeigt.')}catch(e){status('Updates konnten gerade nicht geprüft werden.')}}
 function applyUpdate(){waitingWorker=reg?.waiting||waitingWorker;if(!waitingWorker||!persist())return;stopVoice();sessionStorage.setItem('einkauf-updating','yes');waitingWorker.postMessage({type:'ACTIVATE'})}
 for(const overlay of document.querySelectorAll('.modal-overlay')){overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none'})}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of document.querySelectorAll('.modal-overlay'))o.style.display='none';$('dropdown-menu').classList.remove('show')}if(e.key==='Tab'){const modal=[...document.querySelectorAll('.modal-overlay')].find(o=>o.style.display==='flex');if(modal){const focus=[...modal.querySelectorAll('button,input,select')].filter(x=>!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus()}}}});
-$('manual-input').addEventListener('input',renderSuggestions);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const o of document.querySelectorAll('.modal-overlay'))o.style.display='none';$('dropdown-menu').classList.remove('show')}if(e.key==='Tab'){const modal=[...document.querySelectorAll('.modal-overlay')].find(o=>o.style.display==='flex');if(modal){const focus=[...modal.querySelectorAll('button,input,select')].filter(x=>!x.disabled);if(e.shiftKey&&(document.activeElement===focus[0]||!focus.includes(document.activeElement))){e.preventDefault();focus.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus()}}}});
+$('manual-input').addEventListener('input',()=>{showEntryFeedback('');if(!keepRecording)$('voice-transcript').textContent='';renderSuggestions()});
 $('app-version').textContent='Version '+APP_VERSION;
 init();
 readIncomingRecipe();
