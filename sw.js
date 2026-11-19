@@ -1,4 +1,4 @@
-const VERSION='einkauf-v3-20261119-github-17';
+const VERSION='einkauf-v3-20261119-github-18';
 const FILES=['./','./index.html','./app.js','./product-pictures.js','./mqtt.min.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(VERSION);await cache.addAll(FILES.map(path=>new Request(new URL(path,self.location).href,{cache:'reload'})))})()));
 // Neue Versionen bleiben in waiting, bis der Nutzer ausdrücklich zustimmt.

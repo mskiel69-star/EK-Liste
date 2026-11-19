@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.8';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.9';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -363,8 +363,8 @@ function itemRow(item, done = false) {
     button('×', () => safeDeleteItem(item.id), 'btn-action-icon danger', 'Artikel löschen'),
     button('✎', () => openEditor(item), 'btn-action-icon', 'Artikel bearbeiten')
   );
-  const pictureButton = button('', () => openEditor(item, true), 'article-photo-button',
-    'Eigenes Foto für ' + item.title + ' hinterlegen');
+  const pictureButton = button('', () => openArticlePhoto(item), 'article-photo-button',
+    'Foto von ' + item.title + ' vergrößern');
   pictureButton.append(articlePicture(item), text('span', '📷', 'photo-badge'));
   row.append(check, pictureButton, info, actions);
   if (pending.has(item.id)) decorate(row);
@@ -620,6 +620,28 @@ function addFromInput() {
   input.value = '';
   input.blur();
   renderSuggestions();
+}
+
+function openArticlePhoto(item) {
+  $('manual-input').blur();
+  const overlay = $('photo-modal');
+  const modal = overlay.querySelector('.modal');
+  const heading = text('h2', item.title);
+  heading.id = 'photo-title';
+  const preview = text('div', '', 'article-photo-large');
+  preview.append(articlePicture(item));
+  const close = button('Schließen', () => {
+    overlay.style.display = 'none';
+    $('row_' + item.id)?.querySelector('.article-photo-button')?.focus();
+  }, 'btn-modal');
+  const edit = button('Eigenes Foto ändern / aufnehmen', () => {
+    overlay.style.display = 'none';
+    const current = items.find(entry => entry.id === item.id);
+    if (current) openEditor(current, true);
+  }, 'btn-modal');
+  modal.replaceChildren(heading, preview, edit, close);
+  overlay.style.display = 'flex';
+  close.focus();
 }
 
 function openEditor(item, focusPhoto = false) {
