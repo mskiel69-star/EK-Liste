@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.7';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.8';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -363,7 +363,10 @@ function itemRow(item, done = false) {
     button('×', () => safeDeleteItem(item.id), 'btn-action-icon danger', 'Artikel löschen'),
     button('✎', () => openEditor(item), 'btn-action-icon', 'Artikel bearbeiten')
   );
-  row.append(check, articlePicture(item), info, actions);
+  const pictureButton = button('', () => openEditor(item, true), 'article-photo-button',
+    'Eigenes Foto für ' + item.title + ' hinterlegen');
+  pictureButton.append(articlePicture(item), text('span', '📷', 'photo-badge'));
+  row.append(check, pictureButton, info, actions);
   if (pending.has(item.id)) decorate(row);
   return row;
 }
@@ -619,7 +622,8 @@ function addFromInput() {
   renderSuggestions();
 }
 
-function openEditor(item) {
+function openEditor(item, focusPhoto = false) {
+  $('manual-input').blur();
   editingItemId = editingNoteItemId = editingStoreItemId = item.id;
   const overlay = $('note-modal');
   const modal = overlay.querySelector('.modal');
@@ -669,6 +673,12 @@ function openEditor(item) {
   file.type = 'file';
   file.accept = 'image/*';
   fileLabel.append(file);
+  const cameraLabel = text('label', 'Foto aufnehmen');
+  const camera = document.createElement('input');
+  camera.type = 'file';
+  camera.accept = 'image/*';
+  camera.setAttribute('capture', 'environment');
+  cameraLabel.append(camera);
   const message = text('p', '', 'picture-message');
   message.setAttribute('role', 'status');
   const save = button('Speichern', () => {}, 'btn-modal');
@@ -677,6 +687,7 @@ function openEditor(item) {
   const remove = button('Standardbild verwenden', () => {
     selection++;
     file.value = '';
+    camera.value = '';
     draftImage = null;
     imageChanged = true;
     message.textContent = '';
@@ -689,8 +700,8 @@ function openEditor(item) {
     remove.disabled = !draftImage;
   }
 
-  file.onchange = async () => {
-    const selected = file.files[0];
+  async function selectPhoto(input) {
+    const selected = input.files[0];
     const revision = ++selection;
     if (!selected) {
       save.disabled = false;
@@ -708,7 +719,7 @@ function openEditor(item) {
       message.textContent = 'Foto ist bereit. Tippe auf Speichern.';
     } catch (error) {
       if (revision !== selection) return;
-      file.value = '';
+      input.value = '';
       message.textContent = error instanceof Error && error.message.startsWith('Wähle')
         ? error.message : 'Foto konnte nicht geöffnet werden. Versuche es mit JPG oder PNG.';
     } finally {
@@ -716,9 +727,12 @@ function openEditor(item) {
     }
   };
 
+  file.onchange = () => selectPhoto(file);
+  camera.onchange = () => selectPhoto(camera);
   updatePreview();
-  pictureEditor.append(preview, fileLabel, remove, message);
-  form.append(pictureEditor, save, button('Abbrechen', closeNoteModal, 'btn-modal'));
+  pictureEditor.append(preview, fileLabel, cameraLabel, remove, message);
+  form.prepend(pictureEditor);
+  form.append(save, button('Abbrechen', closeNoteModal, 'btn-modal'));
   form.onsubmit = event => {
     event.preventDefault();
     if (save.disabled) return;
@@ -744,13 +758,24 @@ function openEditor(item) {
       categoryDict[norm(current.title)] = current.category;
     }
     if (imageChanged) current.image = draftImage;
-    broadcastState();
+    const saved = broadcastState();
     render();
+    if (!saved) {
+      message.textContent = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
+      return;
+    }
     closeNoteModal();
+    if (imageChanged) showEntryFeedback(draftImage ? 'Eigenes Foto für ' + current.title + ' gespeichert.' : 'Standardbild für ' + current.title + ' wiederhergestellt.');
   };
   modal.append(form);
   overlay.style.display = 'flex';
-  heading.focus();
+  if (focusPhoto) {
+    pictureEditor.tabIndex = -1;
+    pictureEditor.focus();
+    pictureEditor.scrollIntoView({block: 'nearest'});
+  } else {
+    heading.focus();
+  }
 }
 function closeNoteModal(){$('note-modal').style.display='none'}
 function toggleInfo(){const panel=$('info-panel');panel.hidden=!panel.hidden;$('info-toggle').setAttribute('aria-expanded',String(!panel.hidden));if(panel.hidden)$('info-toggle').focus()}
