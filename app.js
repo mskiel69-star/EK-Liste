@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.2';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.3';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -630,10 +630,11 @@ function updateOfferLink() {
   const link = $('offer-kaufda');
   link.hidden = !product;
   if (product) {
-    const slug = product.replace(/ä/g, 'ae').replace(/ö/g, 'oe')
-      .replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe')
-      .replace(/Ü/g, 'Ue').replace(/ß/g, 'ss');
-    link.href = 'https://www.kaufda.de/Kiel/Angebote/' + encodeURIComponent(slug);
+    const search = new URL('https://www.kaufda.de/search');
+    search.searchParams.set('query', product);
+    search.searchParams.set('zip', '24145');
+    search.searchParams.set('city', 'Kiel');
+    link.href = search.href;
     link.textContent = '„' + product + '“ bei kaufDA suchen ↗';
   } else {
     link.removeAttribute('href');
