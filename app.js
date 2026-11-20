@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.6';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.7';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -357,11 +357,13 @@ function itemRow(item, done = false) {
   check.onchange = () => done ? toggleItemDirect(item.id) : handleCheckWithAnimation(item.id);
 
   const info = text('div', '', 'item-info');
-  info.append(text('span', item.title, done ? 'title' : 'item-name'));
-  if (item.note) info.append(text('span', item.note, 'item-extra-note'));
+  const summary = text('div', '', 'item-summary');
+  summary.append(text('span', item.title, done ? 'title' : 'item-name'));
+  if (item.note) summary.append(text('span', item.note, 'item-extra-note'));
   if (item.recipeQuantity && !recipeAmountPattern.test(item.note || '')) {
-    info.append(text('span', item.recipeQuantity, 'item-extra-note'));
+    summary.append(text('span', item.recipeQuantity, 'item-extra-note'));
   }
+  info.append(summary);
   if (item.targetStore) info.append(text('span', 'Bei ' + item.targetStore, 'badge-store'));
   attachRegionalOffers(info, item, done);
 
