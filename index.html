@@ -335,8 +335,8 @@
 .btn-offer-search{flex:0 0 34px;min-height:44px;padding:0;border:1px solid #cbd9ca;border-radius:8px;background:#edf1e8;color:#285c45;font-size:1rem;font-weight:700}
 #offer-product{width:100%;box-sizing:border-box;padding:12px;margin-top:6px}
 #offer-modal p{line-height:1.5}
-#offer-kaufda{display:block;box-sizing:border-box;text-align:center;text-decoration:none}
-#offer-kaufda[hidden]{display:none}
+#offer-kaufda,#offer-kaufda-web{display:block;box-sizing:border-box;text-align:center;text-decoration:none}
+#offer-kaufda[hidden],#offer-kaufda-web[hidden]{display:none}
 .regional-offers{display:flex;flex-direction:column;gap:4px;margin-top:5px}
 .regional-offers:empty{display:none}
 .regional-offer{align-self:flex-start;border-radius:5px;background:#fff0d4;color:#8a4200;font-size:.76rem;line-height:1.4;padding:3px 6px;font-weight:700;text-decoration:none;overflow-wrap:anywhere}
@@ -523,7 +523,9 @@ body:has(#voice-transcript:not(:empty),#entry-feedback:not(:empty)){padding-bott
       <input id="offer-product" type="text" maxlength="200" autocomplete="off" oninput="updateOfferLink()" placeholder="z. B. Butter">
       <p>Der Link öffnet die kaufDA-Angebote für Kiel. Prüfe dort Standort 24145, Filiale und Gültigkeit. Die 50 km sind deine Suchvorgabe; der Link setzt diesen Radius bei kaufDA nicht automatisch.</p>
       <p>Weitere Angebote kannst du über die kaufDA-Suche öffnen.</p>
-      <a id="offer-kaufda" class="btn-modal" target="_blank" rel="noopener noreferrer" hidden></a>
+      <a id="offer-kaufda" class="btn-modal" target="_self" hidden></a>
+      <a id="offer-kaufda-web" class="btn-modal" target="_blank" rel="noopener noreferrer" hidden></a>
+      <p>Die App-Suche verwendet den in kaufDA eingestellten Standort. Falls die App nicht öffnet, nutze den Browser-Link.</p>
       <button class="btn-modal" onclick="document.getElementById('offer-modal').style.display='none'">Schließen</button>
     </div>
   </div>
