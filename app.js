@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.4.9';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.0';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -622,6 +622,30 @@ function addFromInput() {
   renderSuggestions();
 }
 
+function updateOfferLink() {
+  const input = $('offer-product');
+  const product = input.value.trim();
+  const link = $('offer-kaufda');
+  link.hidden = !product;
+  if (product) {
+    const slug = product.replace(/ä/g, 'ae').replace(/ö/g, 'oe')
+      .replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe')
+      .replace(/Ü/g, 'Ue').replace(/ß/g, 'ss');
+    link.href = 'https://www.kaufda.de/Kiel/Angebote/' + encodeURIComponent(slug);
+    link.textContent = '„' + product + '“ bei kaufDA suchen ↗';
+  } else {
+    link.removeAttribute('href');
+  }
+}
+
+function openOfferSearch(product) {
+  $('manual-input').blur();
+  $('offer-product').value = typeof product === 'string' ? product : $('manual-input').value.trim();
+  updateOfferLink();
+  $('offer-modal').style.display = 'flex';
+  $('offer-heading').focus();
+}
+
 function openArticlePhoto(item) {
   $('manual-input').blur();
   const overlay = $('photo-modal');
@@ -754,7 +778,10 @@ function openEditor(item, focusPhoto = false) {
   updatePreview();
   pictureEditor.append(preview, fileLabel, cameraLabel, remove, message);
   form.prepend(pictureEditor);
-  form.append(save, button('Abbrechen', closeNoteModal, 'btn-modal'));
+  form.append(button('Angebote für diesen Artikel suchen', () => {
+    overlay.style.display = 'none';
+    openOfferSearch(fields.title.value);
+  }, 'btn-modal'), save, button('Abbrechen', closeNoteModal, 'btn-modal'));
   form.onsubmit = event => {
     event.preventDefault();
     if (save.disabled) return;
