@@ -508,11 +508,14 @@ body:has(#voice-transcript:not(:empty),#entry-feedback:not(:empty)){padding-bott
   <div class="modal-overlay" id="offer-modal" aria-labelledby="offer-heading">
     <div class="modal">
       <h2 id="offer-heading" tabindex="-1">Angebote suchen</h2>
+      <div id="regional-offer-details" hidden>
       <p><strong>Automatische Angebote für 24145 Kiel</strong></p>
       <p>Offene Artikelnamen und die Postleitzahl werden zur Angebotssuche an marktguru übermittelt. Tippe auf einen Hinweis am Artikel, um Packungsgröße, Bedingungen und Filiale zu prüfen.</p>
       <p id="regional-offer-status" role="status"></p>
       <p>Gewünschter Umkreis: 50 km. Die Quelle liefert regionale Treffer zur Postleitzahl; eine genaue Begrenzung auf 50 km ist bisher unbestätigt.</p>
       <p><a href="https://www.marktguru.de/?zip=24145" target="_blank" rel="noopener noreferrer">Angebotsquelle marktguru</a></p>
+      </div>
+      <p>Gewünschtes Suchgebiet: <strong>24145 Kiel · 50 km Umkreis</strong></p>
       <label for="offer-product">Artikel</label>
       <input id="offer-product" type="text" maxlength="200" autocomplete="off" oninput="updateOfferLink()" placeholder="z. B. Butter">
       <p>Der Link öffnet die kaufDA-Angebote für Kiel. Prüfe dort Standort 24145, Filiale und Gültigkeit. Die 50 km sind deine Suchvorgabe; der Link setzt diesen Radius bei kaufDA nicht automatisch.</p>

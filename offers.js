@@ -1,5 +1,12 @@
 'use strict';
 
+// Paused at the user's request on 2026-11-20: the tested free provider did
+// not provide verified ALDI Nord and Famila coverage for 24145.
+// Reactivate only after verifying both retailers and reviewing the requested
+// 50 km radius. Set regionalOffersEnabled to true, then bump APP_VERSION
+// and the service-worker VERSION before deployment. Code and UI are retained.
+const regionalOffersEnabled = false;
+
 // Regional offer results are kept separately from shared shopping-list records.
 const regionalOffers = new Map();
 let offerCheckTimer;
@@ -48,6 +55,7 @@ function matchingRegionalOffers(entries, query, now = Date.now()) {
 }
 
 function updateRegionalOfferBadges() {
+  if (!regionalOffersEnabled) return;
   for (const box of document.querySelectorAll('[data-offer-query]')) {
     box.replaceChildren();
     const result = regionalOffers.get(box.dataset.offerQuery);
@@ -80,7 +88,7 @@ function updateRegionalOfferBadges() {
 }
 
 function attachRegionalOffers(info, item, done) {
-  if (done) return;
+  if (!regionalOffersEnabled || done) return;
   const box = document.createElement('span');
   box.className = 'regional-offers';
   box.dataset.offerQuery = offerQueryKey(item.title);
@@ -88,13 +96,14 @@ function attachRegionalOffers(info, item, done) {
 }
 
 function scheduleRegionalOfferCheck() {
+  if (!regionalOffersEnabled) return;
   updateRegionalOfferBadges();
   clearTimeout(offerCheckTimer);
   offerCheckTimer = setTimeout(checkRegionalOffers, 700);
 }
 
 async function checkRegionalOffers() {
-  if (offerCheckRunning || !navigator.onLine || document.hidden) return;
+  if (!regionalOffersEnabled || offerCheckRunning || !navigator.onLine || document.hidden) return;
   offerCheckRunning = true;
   offerCheckError = '';
   updateRegionalOfferBadges();
@@ -142,11 +151,15 @@ async function checkRegionalOffers() {
   }
 }
 
-window.addEventListener('online', scheduleRegionalOfferCheck);
-window.addEventListener('offline', updateRegionalOfferBadges);
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) scheduleRegionalOfferCheck();
-});
-setInterval(() => {
-  if (!document.hidden) scheduleRegionalOfferCheck();
-}, offerCacheDuration);
+const regionalDetails = document.getElementById('regional-offer-details');
+if (regionalDetails) regionalDetails.hidden = !regionalOffersEnabled;
+if (regionalOffersEnabled) {
+  window.addEventListener('online', scheduleRegionalOfferCheck);
+  window.addEventListener('offline', updateRegionalOfferBadges);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleRegionalOfferCheck();
+  });
+  setInterval(() => {
+    if (!document.hidden) scheduleRegionalOfferCheck();
+  }, offerCacheDuration);
+}
