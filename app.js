@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.4';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.5';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -269,7 +269,7 @@ function render() {
   scheduleRegionalOfferCheck();
 }
 
-const itemImageLimit = 8000;
+const itemImageLimit = 80000;
 const listImageLimit = 550000;
 const categoryPictures = new Map([
   ['Gemüse', '🥬'], ['Brot', '🍞'], ['Kühlregal', '🥛'], ['Fleisch und Wurst', '🥩'],
@@ -323,15 +323,20 @@ async function makeItemThumbnail(file) {
     await image.decode();
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    const side = Math.min(image.naturalWidth, image.naturalHeight);
-    if (!context || !side) throw new Error('Das Bild konnte nicht geöffnet werden.');
-    for (const size of [112, 88, 64]) {
-      canvas.width = canvas.height = size;
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    if (!context || !image.naturalWidth || !image.naturalHeight) {
+      throw new Error('Das Bild konnte nicht geöffnet werden.');
+    }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    for (const maxSize of [1024, 800, 640, 512]) {
+      const scale = Math.min(1, maxSize / longestSide);
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
       context.fillStyle = '#fff';
-      context.fillRect(0, 0, size, size);
-      context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2,
-        side, side, 0, 0, size, size);
-      for (const quality of [0.8, 0.6, 0.4]) {
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.92, 0.85, 0.76]) {
         const thumbnail = canvas.toDataURL('image/jpeg', quality);
         if (validItemImage(thumbnail)) return thumbnail;
       }
@@ -716,6 +721,7 @@ function openEditor(item, focusPhoto = false) {
   let selection = 0;
   const pictureEditor = text('fieldset', '', 'picture-editor');
   pictureEditor.append(text('legend', 'Artikelbild'));
+  pictureEditor.append(text('p', 'Neue Fotos werden mit bis zu 1024 Pixeln gespeichert. Für ein schärferes Bild wähle ein bisheriges Foto erneut aus.', 'picture-message'));
   const preview = text('div', '', 'picture-preview');
   const fileLabel = text('label', 'Eigenes Foto auswählen');
   const file = document.createElement('input');
