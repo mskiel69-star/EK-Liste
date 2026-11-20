@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.0';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.1';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -266,6 +266,7 @@ function render() {
   for (const item of done.sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))) $('done-list').append(itemRow(item, true));
   renderSuggestions();
   refreshRouteEditor();
+  scheduleRegionalOfferCheck();
 }
 
 const itemImageLimit = 8000;
@@ -357,6 +358,7 @@ function itemRow(item, done = false) {
     info.append(text('span', item.recipeQuantity, 'item-extra-note'));
   }
   if (item.targetStore) info.append(text('span', 'Bei ' + item.targetStore, 'badge-store'));
+  attachRegionalOffers(info, item, done);
 
   const actions = text('div', '', 'item-actions');
   actions.append(
