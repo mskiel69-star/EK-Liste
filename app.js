@@ -22,7 +22,7 @@
 
 const $=id=>document.getElementById(id), norm=s=>s.trim().toLocaleLowerCase('de'), clone=o=>JSON.parse(JSON.stringify(o));
 const uuid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(24)),x=>x.toString(16).padStart(2,'0')).join('');
-const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.8';
+const client=uuid(), STORAGE='einkauf-v3', APP_VERSION='3.5.9';
 let deviceId;try{deviceId=localStorage.getItem('einkauf-device-id');if(!deviceId){deviceId=uuid();localStorage.setItem('einkauf-device-id',deviceId)}}catch(e){deviceId=client}
 let db={schema:3,rooms:{},room:'',activeStore:'Aldi'}, records={}, items=[],storeRoutes={},categoryDict={},activeStore='Aldi',syncCode='', mqttClient=null,clock=0, syncReady=false, key=null,topic='', generation=0;
 let editingItemId=null,editingStoreItemId=null,editingNoteItemId=null,recognition=null,keepRecording=false, waitingWorker=null,reg=null;
@@ -369,7 +369,7 @@ function itemRow(item, done = false) {
 
   const actions = text('div', '', 'item-actions');
   actions.append(
-    button('×', () => safeDeleteItem(item.id), 'btn-action-icon danger', 'Artikel löschen'),
+    button('%', () => openOfferSearch(item.title), 'btn-action-icon', 'Angebote für ' + item.title + ' suchen'),
     button('✎', () => openEditor(item), 'btn-action-icon', 'Artikel bearbeiten')
   );
   const pictureButton = button('', () => openArticlePhoto(item), 'article-photo-button',
@@ -799,6 +799,14 @@ function openEditor(item, focusPhoto = false) {
     overlay.style.display = 'none';
     openOfferSearch(fields.title.value);
   }, 'btn-modal'), save, button('Abbrechen', closeNoteModal, 'btn-modal'));
+  const deleteButton = button('× Artikel löschen', () => {
+    safeDeleteItem(item.id);
+    if (!items.some(entry => entry.id === item.id)) closeNoteModal();
+  }, 'btn-modal');
+  deleteButton.style.background = '#ffebee';
+  deleteButton.style.color = '#c62828';
+  deleteButton.style.marginTop = '20px';
+  form.append(deleteButton);
   form.onsubmit = event => {
     event.preventDefault();
     if (save.disabled) return;
