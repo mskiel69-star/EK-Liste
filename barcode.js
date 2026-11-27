@@ -7,6 +7,8 @@ let barcodeRequest;
 let barcodeAccepting = false;
 let barcodeCategory = 'Sonstiges';
 let scannedBarcode = '';
+let barcodeHintTimer;
+let barcodeZoomTimer;
 
 function validShoppingBarcode(code) {
   if (!/^(?:\d{8}|\d{12,14})$/.test(code)) return false;
@@ -18,6 +20,9 @@ function validShoppingBarcode(code) {
 
 function stopBarcodeCamera() {
   barcodeAccepting = false;
+  clearTimeout(barcodeHintTimer);
+  clearTimeout(barcodeZoomTimer);
+  $('barcode-camera-tools').hidden = true;
   barcodeControls?.stop();
   barcodeControls = undefined;
   barcodeStream?.getTracks().forEach(track => track.stop());
@@ -49,6 +54,46 @@ function openBarcodeScanner() {
   startBarcodeCamera();
 }
 
+function shoppingBarcodeReader() {
+  const reader = new ZXingBrowser.BrowserMultiFormatReader(undefined, {
+    delayBetweenScanAttempts: 200, delayBetweenScanSuccess: 1000
+  });
+  const formats = ZXingBrowser.BarcodeFormat;
+  reader.possibleFormats = [formats.EAN_13, formats.EAN_8, formats.UPC_A, formats.CODE_128, formats.ITF];
+  return reader;
+}
+
+async function configureBarcodeCamera(track) {
+  let capabilities = {};
+  try { capabilities = track.getCapabilities?.() || {}; } catch {}
+  // Request autofocus only when the selected camera exposes it.
+  if (capabilities.focusMode?.includes('continuous')) {
+    try { await track.applyConstraints({advanced: [{focusMode: 'continuous'}]}); } catch {}
+  }
+  const zoom = capabilities.zoom;
+  const slider = $('barcode-zoom');
+  $('barcode-zoom-label').hidden = !(zoom && zoom.max > zoom.min);
+  if (zoom && zoom.max > zoom.min) {
+    slider.min = zoom.min;
+    slider.max = Math.min(zoom.max, Math.max(zoom.min, 4));
+    slider.step = zoom.step || 0.1;
+    slider.value = track.getSettings?.().zoom || zoom.min;
+  }
+}
+
+function changeBarcodeZoom() {
+  const track = barcodeStream?.getVideoTracks()[0];
+  if (!track) return;
+  const zoom = Number($('barcode-zoom').value);
+  clearTimeout(barcodeZoomTimer);
+  barcodeZoomTimer = setTimeout(async () => {
+    if (track !== barcodeStream?.getVideoTracks()[0]) return;
+    try { await track.applyConstraints({advanced: [{zoom}]}); } catch {
+      $('barcode-status').textContent = 'Der Zoom ist bei dieser Kamera nicht verfügbar. Halte den Artikel etwas weiter entfernt.';
+    }
+  }, 100);
+}
+
 async function startBarcodeCamera() {
   const session = ++barcodeSession;
   barcodeRequest?.abort();
@@ -57,39 +102,141 @@ async function startBarcodeCamera() {
   $('barcode-source').hidden = true;
   scannedBarcode = '';
   if (!navigator.mediaDevices?.getUserMedia || !window.ZXingBrowser) {
-    $('barcode-status').textContent = 'Die Kamera ist hier nicht verfügbar. Du kannst die Barcode-Nummer unten eingeben.';
+    $('barcode-status').textContent = 'Die Kamera ist hier nicht verfügbar. Du kannst ein Barcode-Foto auswählen oder die Nummer unten eingeben.';
     return;
   }
   $('barcode-status').textContent = 'Kamera wird gestartet. Bitte Kamerazugriff erlauben.';
+  let stream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false, video: {facingMode: {ideal: 'environment'}, width: {ideal: 1280}, height: {ideal: 720}}
-    });
+    const selected = $('barcode-camera').value;
+    const videoConstraints = {
+      width: {ideal: 1920}, height: {ideal: 1080},
+      ...(selected ? {deviceId: {exact: selected}} : {facingMode: {ideal: 'environment'}})
+    };
+    stream = await navigator.mediaDevices.getUserMedia({audio: false, video: videoConstraints});
     if (session !== barcodeSession) {
       stream.getTracks().forEach(track => track.stop());
       return;
     }
     barcodeStream = stream;
+    // On multi-camera iPhones the default environment device may be an ultra-wide lens.
+    // Prefer the named standard back camera, and keep an explicit camera selector.
+    let cameras = [];
+    try { cameras = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput'); } catch {}
+    if (session !== barcodeSession) return;
+    const standardBack = cameras.find(camera => /^(back camera|rückkamera|hintere kamera)$/i.test(camera.label));
+    if (!selected && standardBack && standardBack.deviceId !== stream.getVideoTracks()[0].getSettings?.().deviceId) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {
+        ...videoConstraints, deviceId: {exact: standardBack.deviceId}
+      }});
+      if (session !== barcodeSession) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      barcodeStream = stream;
+    }
+    const track = stream.getVideoTracks()[0];
+    const chooser = $('barcode-camera');
+    chooser.replaceChildren();
+    cameras.forEach((camera, index) => {
+      const option = document.createElement('option');
+      option.value = camera.deviceId;
+      option.textContent = camera.label || 'Kamera ' + (index + 1);
+      chooser.append(option);
+    });
+    chooser.value = track.getSettings?.().deviceId || selected;
+    chooser.disabled = cameras.length < 2;
+    await configureBarcodeCamera(track);
+    if (session !== barcodeSession) return;
+    $('barcode-camera-tools').hidden = false;
     barcodeAccepting = true;
     const video = $('barcode-video');
     video.hidden = false;
-    $('barcode-status').textContent = 'Halte den gesamten Strichcode ruhig und gut beleuchtet in die Kamera.';
-    const reader = new ZXingBrowser.BrowserMultiFormatOneDReader(undefined, {
-      delayBetweenScanAttempts: 250, delayBetweenScanSuccess: 1000
-    });
-    const controls = await reader.decodeFromStream(stream, video, result => {
-      if (session !== barcodeSession || !barcodeAccepting || !result) return;
-      const code = result.getText().trim();
-      if (validShoppingBarcode(code)) lookupShoppingBarcode(code);
+    const started = Date.now();
+    let attempts = 0;
+    $('barcode-status').textContent = 'Kamera aktiv. Halte den ganzen Strichcode waagerecht in die Bildmitte, etwa 15–25 cm entfernt.';
+    barcodeHintTimer = setTimeout(() => {
+      if (session === barcodeSession && barcodeAccepting) {
+        $('barcode-status').textContent = 'Noch kein Barcode erkannt. Halte mehr Abstand, bis die Striche scharf sind. Nutze den Zoom, eine andere Kamera oder „Barcode-Foto aufnehmen“.';
+      }
+    }, 8000);
+    const controls = await shoppingBarcodeReader().decodeFromStream(stream, video, result => {
+      if (session !== barcodeSession || !barcodeAccepting) return;
+      attempts++;
+      if (result) {
+        const code = result.getText().trim();
+        if (validShoppingBarcode(code)) lookupShoppingBarcode(code);
+        else $('barcode-status').textContent = 'Code erkannt, aber keine gültige EAN/UPC-Artikelnummer. Bitte den Produkt-Strichcode erfassen.';
+      } else if (attempts === 1 && Date.now() - started < 8000) {
+        $('barcode-status').textContent = 'Scanner läuft und prüft das Kamerabild. Ganzen Strichcode waagerecht in der Bildmitte halten.';
+      }
     });
     if (session !== barcodeSession || !barcodeAccepting) controls.stop();
     else barcodeControls = controls;
   } catch (error) {
-    if (session !== barcodeSession) return;
+    if (session !== barcodeSession) {
+      stream?.getTracks().forEach(track => track.stop());
+      return;
+    }
     stopBarcodeCamera();
     $('barcode-status').textContent = error.name === 'NotAllowedError'
-      ? 'Kamerazugriff wurde nicht erlaubt. Erlaube ihn in den Browser-Einstellungen oder gib den Barcode unten ein.'
-      : 'Kamera konnte nicht gestartet werden. Du kannst die Barcode-Nummer unten eingeben.';
+      ? 'Kamerazugriff wurde nicht erlaubt. Erlaube ihn in den Browser-Einstellungen oder nutze ein Barcode-Foto.'
+      : 'Kamera konnte nicht gestartet werden. Wähle eine andere Kamera oder nutze ein Barcode-Foto.';
+    $('barcode-camera-tools').hidden = false;
+  }
+}
+
+async function scanBarcodePhoto(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const session = ++barcodeSession;
+  barcodeRequest?.abort();
+  stopBarcodeCamera();
+  $('barcode-result').hidden = true;
+  $('barcode-source').hidden = true;
+  $('barcode-status').textContent = 'Barcode-Foto wird geprüft …';
+  let url;
+  try {
+    if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('size');
+    const image = new Image();
+    url = URL.createObjectURL(file);
+    image.src = url;
+    await image.decode();
+    if (session !== barcodeSession) return;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context || !image.naturalWidth || !image.naturalHeight) throw new Error('image');
+    const scale = Math.min(1, 2000 / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const reader = shoppingBarcodeReader();
+    let result;
+    for (const rotated of [false, true]) {
+      canvas.width = rotated ? height : width;
+      canvas.height = rotated ? width : height;
+      if (rotated) {
+        context.translate(canvas.width, 0);
+        context.rotate(Math.PI / 2);
+      }
+      context.drawImage(image, 0, 0, width, height);
+      try {
+        const candidate = reader.decodeFromCanvas(canvas).getText().trim();
+        if (validShoppingBarcode(candidate)) { result = candidate; break; }
+      } catch {}
+    }
+    if (session !== barcodeSession) return;
+    if (result) await lookupShoppingBarcode(result);
+    else $('barcode-status').textContent = 'Im Foto wurde kein gültiger Produktbarcode erkannt. Fotografiere ihn scharf mit etwas weißem Rand.';
+  } catch (error) {
+    if (session === barcodeSession) {
+      $('barcode-status').textContent = error.message === 'size'
+        ? 'Bitte ein Foto mit höchstens 20 MB auswählen.'
+        : 'Foto konnte nicht gelesen werden. Versuche ein scharfes JPG- oder PNG-Foto.';
+    }
+  } finally {
+    input.value = '';
+    if (url) URL.revokeObjectURL(url);
   }
 }
 
